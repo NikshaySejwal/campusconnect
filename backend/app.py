@@ -1,21 +1,15 @@
 from flask import Flask
 from flask_restful import Api
-from flask_jwt_extended import JWTManager  
-from sqlalchemy import create_engine
-from models import Base
+from flask_jwt_extended import JWTManager
+from models import Base, engine
 from flask_cors import CORS
 from sqlalchemy.orm import sessionmaker
-
-
-
 
 app = Flask(__name__)
 CORS(app)
 
-
-engine= create_engine('sqlite:///campus_connect.db')
 Base.metadata.create_all(engine)
-sessionLocal = sessionmaker(autocommit = False, autoflush = False, bind = engine)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 #jwt config
@@ -49,31 +43,44 @@ def seed_admin_user():
 # run seeding at startup
 seed_admin_user()
 
-# Resources (in resources/ folder or same file)
-from resources.auth import Register, Login
-from resources.company import CompanyRegistration, CompanyApprovalList, CompanyApprovalAction
-from resources.student import StudentProfileResource
-from resources.placement_drive import PlacementDriveResource, PlacementDriveList
-from resources.admin import company_list, student_list, placement_stats
+# Resources from contollers.py
+from contollers import (
+    RegisterResource, LoginResource, CompaniesList, CompanyStatusResource,
+    DrivesListResource, DriveStatusResource, StudentListResource, UserBlacklistResource,
+    AdminStatsResource, AdminSearchResource, CompanyProfileResource, CompanyDrivesResource,
+    CompanyDriveApplicationsResource, CompanyApplicationStatusResource,
+    StudentProfileResource, StudentDrivesResource, StudentApplyResource, StudentApplicationsResource
+)
 
 
 
-#Register all the routes
-api.add_resource(Register, '/register')
-api.add_resource(Login, '/login')
+# Register all the routes
+api.add_resource(RegisterResource, '/register')
+api.add_resource(LoginResource, '/login')
 
+# Company routes
+api.add_resource(CompaniesList, '/admin/companies')
+api.add_resource(CompanyStatusResource, '/admin/company/<int:company_id>/status')
+api.add_resource(CompanyProfileResource, '/company/profile')
+api.add_resource(CompanyDrivesResource, '/company/drives')
+api.add_resource(CompanyDriveApplicationsResource, '/company/drive/<int:drive_id>/applications')
+api.add_resource(CompanyApplicationStatusResource, '/company/application/<int:application_id>/status')
 
-api.add_resource(CompanyRegistration, '/company/register')
-api.add_resource(CompanyApprovalList, '/company/approval-list')
-api.add_resource(CompanyApprovalAction, '/company/approve/<int:company_id>')
+# Placement drive routes
+api.add_resource(DrivesListResource, '/admin/drives')
+api.add_resource(DriveStatusResource, '/admin/drive/<int:drive_id>/status')
+api.add_resource(StudentDrivesResource, '/student/drives')
+
+# Student routes
+api.add_resource(StudentListResource, '/admin/students')
 api.add_resource(StudentProfileResource, '/student/profile')
-api.add_resource(PlacementDriveResource, '/placement-drive/<int:drive_id>')
-api.add_resource(PlacementDriveList, '/placement-drives')
+api.add_resource(StudentApplyResource, '/student/drive/<int:drive_id>/apply')
+api.add_resource(StudentApplicationsResource, '/student/applications')
 
-
-api.add_resource(company_list, '/admin/companies')
-api.add_resource(student_list, '/admin/students')
-api.add_resource(placement_stats, '/admin/placement-stats')
+# Admin routes
+api.add_resource(UserBlacklistResource, '/admin/user/<int:user_id>/blacklist')
+api.add_resource(AdminStatsResource, '/admin/stats')
+api.add_resource(AdminSearchResource, '/admin/search')
 
 
 

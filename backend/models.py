@@ -1,9 +1,7 @@
-from flask_sqlalchemy import SQlAlchemy
 from enum import Enum as pyEnum
-from sqlalchemy import Enum
-from sqlalchemy.orm import declarative_base,relationship
+from sqlalchemy import Enum, create_engine, Column, Integer, String, Float, Text, DateTime, Boolean, ForeignKey, func
+from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Text, DateTime, Boolean, ForeignKey, func
 
 
 
@@ -32,7 +30,7 @@ class ApplicationStatus(pyEnum):
     APPLIED = 'APPLIED'
     SHORTLISTED = 'SHORTLISTED'
     SELECTED = 'SELECTED'
-    REJCTED = 'REJECTED'
+    REJECTED = 'REJECTED'
 
 
 
@@ -44,72 +42,73 @@ class Users(Base):
     password = Column(String(200), nullable=False)
     role = Column(Enum(UserRole), default = UserRole.STUDENT, nullable=False)
     is_active = Column(Boolean, default=True)
-    is_blacklisted = Column (Boolean, default=False)
+    is_blacklisted = Column(Boolean, default=False)
 
     # Relationships
-    comapny = relationship('ComapnyProfile', backref='user', uselist=False)
-    student = relationship('StudentProfile', backref='user', uselist = False)
+    company = relationship('CompanyProfile', backref='user', uselist=False)
+    student = relationship('StudentProfile', backref='user', uselist=False)
 
 
 class CompanyProfile(Base):
     __tablename__ = 'company_profiles'
-    id = Column(Integer, ForeignKey('user.id'),  primary_key=True)
-    company_name = Column(String(100), nullable = False)
+    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    company_name = Column(String(100), nullable=False)
     hr_contact = Column(String(100))
-    approval_status = Column(Enum(CompanyApprovalStatus), default= CompanyApprovalStatus.PENDING)
+    approval_status = Column(Enum(CompanyApprovalStatus), default=CompanyApprovalStatus.PENDING)
 
 
 class StudentProfile(Base):
     __tablename__ = 'student_profiles'
-    id = Column(Integer, ForeignKey('user.id'),  primary_key=True)
-    branch = Column(String(50), nullable = False)
-    cgpa = Column (Float, nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    branch = Column(String(50), nullable=False)
+    cgpa = Column(Float, nullable=False)
     graduation_year = Column(Integer)
-    skills = Column(Text) #Json String or comma-separeted 
-
-    user = relationship('Application', backref= 'student', lazy =True)
+    skills = Column(Text)  # Json String or comma-separated
 
 
 class PlacementDrive(Base):
-    __tablename__ = 'palcement_drives'
-    id = Column(Integer, primary_key= True, autoincrement=True)
-    company_id = Column(Integer, ForeignKey('CompanyProfile.id'), nullable= False)
+    __tablename__ = 'placement_drives'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    company_id = Column(Integer, ForeignKey('company_profiles.user_id'), nullable=False)
     company_name = Column(String(100), nullable=False)
-    job_tittle = Column(String(100),nullable=False)
-    job_description = Column(Text,nullable=False)
+    job_title = Column(String(100), nullable=False)
+    job_description = Column(Text, nullable=False)
 
-    # flattened eligibility 
-    eligibility_branch = Column (String(200), nullable= False)
+    # flattened eligibility
+    eligibility_branch = Column(String(200), nullable=False)
     eligibility_min_cgpa = Column(Float, nullable=False)
-    eligibility_year= Column(Integer , nullable=False)
+    eligibility_year = Column(Integer, nullable=False)
 
+    application_deadline = Column(DateTime, nullable=False)
+    status = Column(Enum(DriveStatus), default=DriveStatus.PENDING)
+    created_at = Column(DateTime, default=func.now())
 
-    application_deadline = Column(datetime, nullable = False)
-    status = Column(Enum(DriveStatus), default = DriveStatus.PENDING)
-    created_at = Column(DateTime, default = func.now())
-
-    application = relationship('Application', backref= 'drive', lazy= True)
-    company = relationship('CompanyProfile', backref= 'PlacementDrive')
+    applications = relationship('Application', backref='drive', lazy=True)
+    company = relationship('CompanyProfile', backref='placement_drives')
 
 
 
 
 class Application(Base):
     __tablename__ = 'applications'
-    id = Column (Integer, primary_key=True,autoincrement= True)
-    student_id= Column(Integer, ForeignKey('StudentProfile.id'), nullable= False)
-    student_name = Column(String(100), nullable= False)  #denormalized
-    drive_id= Column (Integer, ForeignKey('PlacementDrive.id'), nullable= False)
-    drive_title = Column(String, nullable=False)
-    company_name = Column (String, nullable= False)
-    application_date = Column (datetime,nullable= False)
-    status = Column(Enum(ApplicationStatus), default = ApplicationStatus.APPLIED, nullable= False)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    student_id = Column(Integer, ForeignKey('student_profiles.user_id'), nullable=False)
+    student_name = Column(String(100), nullable=False)  # denormalized
+    drive_id = Column(Integer, ForeignKey('placement_drives.id'), nullable=False)
+    drive_title = Column(String(100), nullable=False)
+    company_name = Column(String(100), nullable=False)
+    application_date = Column(DateTime, nullable=False)
+    status = Column(Enum(ApplicationStatus), default=ApplicationStatus.APPLIED, nullable=False)
 
     
 class PlacementStat(Base):
-    __tablename__ = 'placement_stat'
-    id = Column (Integer, nullable = False)
-    total_student = Column (Integer, default= 0 , nullable= False)
-    total_compaines= Column (Integer, default= 0 , nullable= False)
-    total_drive= Column (Integer,default= 0 , nullable= False)
-    total_placement= Column(Integer, default=0, nullable= False)
+    __tablename__ = 'placement_stats'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    total_students = Column(Integer, default=0, nullable=False)
+    total_companies = Column(Integer, default=0, nullable=False)
+    total_drives = Column(Integer, default=0, nullable=False)
+    total_placements = Column(Integer, default=0, nullable=False)
+
+
+# Export engine for use in other modules
+engine = create_engine('sqlite:///campus_connect.db')
