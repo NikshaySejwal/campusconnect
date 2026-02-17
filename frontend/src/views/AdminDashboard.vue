@@ -1,21 +1,21 @@
 <template>
   <div class="admin-dashboard">
     <!-- Navbar placeholder -->
-    <header class="w-100 bg-white">
+    <header class="bg-white">
       <div class="container py-3 px-4">
         <span class="fw-bold fs-5 text-dark">CampusConnect</span>
       </div>
     </header>
 
-    <main class="container p-4 py-5">
+    <main class="dashboard">
       <!-- Header Section -->
-      <div class="mb-5">
+      <div class="header-content">
         <h1 class="fw-bold text-primary mb-2">Placement Cell HQ</h1>
         <p class="text-muted">Manage approvals, moderation, and institutional reports.</p>
       </div>
 
       <!-- Actions -->
-      <div class="mb-5">
+      <div class="actions-toolbar">
           <button class="btn btn-link p-0 text-dark fw-medium mb-3">Activity Report</button>
           <div class="position-relative">
              <i class="bi bi-search position-absolute text-muted search-icon"></i>
@@ -28,9 +28,9 @@
           </div>
       </div>
 
-      <!-- Stats Grid -->
-      <div class="row g-4 mb-5">
-        <div v-for="stat in stats" :key="stat.label" class="col-md-3">
+      <!-- Stats -->
+      <div class="metrics-row">
+        <div v-for="stat in stats" :key="stat.label" class="metric-card">
           <div class="card stat-card h-100 p-3">
               <div class="d-flex justify-content-between align-items-center mb-1">
                 <span class="text-sm font-medium text-muted">{{ stat.label }}</span>
@@ -43,8 +43,8 @@
       </div>
 
       <!-- Main Content Tabs -->
-      <div class="w-100">
-        <div class="d-inline-flex p-1 rounded bg-light mb-4">
+      <div class="tabs-container">
+        <div class="tabs-row">
           <button 
             v-for="tab in ['Approvals', 'Moderation']" 
             :key="tab"
@@ -59,14 +59,14 @@
         </div>
 
         <!-- Approvals Content -->
-        <div v-if="activeTab === 'Approvals'" class="row g-4">
+        <div v-if="activeTab === 'Approvals'" class="approvals-row">
              <!-- Company Applications -->
-            <div class="col-lg-6">
+            <div class="approval-panel">
                 <div class="card h-100 border-light-subtle shadow-sm">
                     <div class="card-body p-4">
                         <h5 class="card-title fw-semibold">Company Applications</h5>
                         <p class="card-subtitle text-muted">Verify and approve corporate registration requests.</p>
-                        <div class="vstack gap-3 mt-4">
+                        <div class="content-stack mt-4">
                             <div v-for="company in pendingCompanies" :key="company.id" class="d-flex justify-content-between align-items-center p-3 border rounded-3 bg-light bg-opacity-50">
                                 <div>
                                     <p class="fw-semibold text-dark mb-0">{{ company.companyName }}</p>
@@ -84,12 +84,12 @@
             </div>
 
             <!-- Drive Requests -->
-            <div class="col-lg-6">
+            <div class="approval-panel">
                 <div class="card h-100 border-light-subtle shadow-sm">
                     <div class="card-body p-4">
                         <h5 class="card-title fw-semibold">Drive Approval Requests</h5>
                         <p class="card-subtitle text-muted">Review new placement drives submitted by companies.</p>
-                        <div class="vstack gap-3 mt-4">
+                        <div class="content-stack mt-4">
                             <div v-for="drive in pendingDrives" :key="drive.id" class="d-flex justify-content-between align-items-center p-3 border rounded-3 bg-light bg-opacity-50">
                                 <div>
                                     <p class="fw-semibold text-dark mb-0">{{ drive.jobTitle }}</p>
@@ -208,6 +208,53 @@ const filteredUsers = computed(() => {
 .admin-dashboard {
   background-color: #f8fafc; 
 }
+
+/* New Flexbox Layout */
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 2rem 2.5rem; /* Replicating container padding */
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.metrics-row {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+}
+
+.metric-card {
+  flex: 1;
+}
+
+.tabs-row {
+  display: flex;
+  padding: 0.25rem;
+  background-color: #f1f5f9; /* bg-light equivalent */
+  border-radius: 0.375rem;
+  width: fit-content;
+}
+
+.approvals-row {
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+}
+
+.approval-panel {
+  flex: 1;
+}
+
+.content-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem; /* Replicating gap-3 utility */
+}
+
+
+/* Base & Component Styles (Largely Unchanged) */
 .text-primary {
     color: #4354e8 !important;
 }
@@ -238,8 +285,6 @@ const filteredUsers = computed(() => {
     box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
 }
 
-.vstack { display: flex; flex-direction: column; }
-
 .table-hover tbody tr:hover {
     background-color: #f8fafc;
 }
@@ -259,5 +304,16 @@ const filteredUsers = computed(() => {
 .border-light-subtle { border-color: #e2e8f0 !important; }
 .card {
     --bs-card-border-color: transparent;
+}
+
+.btn-light.text-muted {
+  color: #64748b !important;
+  background-color: transparent;
+  border: none;
+}
+.btn.bg-white.text-dark.shadow-sm {
+  background-color: #fff;
+  color: #212529;
+  box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
 }
 </style>
