@@ -5,12 +5,13 @@ from models import ApplicationStatus, Base, Users, UserRole, CompanyApprovalStat
 from sqlalchemy import create_engine, or_
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
+import json
+from celery_app import redis_client
 
 # Initialize database session (use the same engine/session as models.py)
 from models import engine
 Session = sessionmaker(bind=engine)
 db = Session()
-
 
 
 
@@ -21,6 +22,32 @@ def is_admin():
     return bool(user and user.role == UserRole.Admin)
 
 
+class PublicDrivesResource(Resource):
+    def get(self):
+        drives = db.query(PlacementDrive).filter(PlacementDrive.status == DriveStatus.APPROVED).all()
+        return {
+            'drives': [{
+                'id': d.id,
+                'title': d.job_title,
+                'company': d.company_name,
+                'deadline': d.application_deadline.isoformat() if isinstance(d.application_deadline, datetime) else str(d.application_deadline),
+            } for d in drives]
+        }, 200
+
+class PublicDriveResource(Resource):
+    def get(self, drive_id):
+        drive = db.query(PlacementDrive).get(drive_id)
+        if not drive or drive.status != DriveStatus.APPROVED:
+            return {'message': 'drive not found or not active'}, 404
+        return {
+            'id': drive.id,
+            'title': drive.job_title,
+            'company': drive.company_name,
+            'description': drive.job_description,
+            'deadline': drive.application_deadline.isoformat() if isinstance(drive.application_deadline, datetime) else str(drive.application_deadline),
+            'branch': drive.eligibility_branch,
+            'cgpa': drive.eligibility_min_cgpa
+        }, 200
 
 
 class RegisterResource(Resource):
@@ -96,31 +123,6 @@ class CompaniesList(Resource):
                 'approval_status': c.approval_status
             } for c in companies]
         }, 200
-
-# class ComapnyApprove(Resource):
-#     @jwt_required()
-#     def post(self, company_id):
-#         if not is_admin():
-#             return {"message": "Admin access required"}, 403
-        
-#         company = session.query(CompanyProfile).get(company_id)
-#         if company and company.approval_status == CompanyApprovalStatus.PENDING:
-#             company.approval_status = CompanyApprovalStatus.APPROVED
-#             session.commit()
-#             return {"message": "Company approved successfully"}, 200
-#         return {'error': 'not found'}, 404
-    
-
-# class ComapanyReject(Resource):
-#     @jwt_required()
-#     def post(self, company_id):
-#         if not is_admin():
-#             return {"message": "Admin access required"}, 403
-#         company = session.query(CompanyProfile).get(company_id)
-#         if company and company.approval_status == CompanyApprovalStatus.PENDING:
-#             company.approval_status = CompanyApprovalStatus.REJECTED
-#             session.commit()
-#             return {"message": "Company rejected successfully"}, 200
 
 
 class CompanyStatusResource(Resource):
@@ -412,6 +414,13 @@ class StudentDrivesResource(Resource):
     @jwt_required()
     def get(self):
         user_id = get_jwt_identity()
+
+        cache_key = f"drives:{user_id}"
+        cached_drives = redis_client.get(cache_key)
+
+        if cached_drives:
+            return json.loads(cached_drives), 200
+
         student = db.query(StudentProfile).filter(StudentProfile.user_id == user_id).first()
         if not student:
             return {'message': 'student profile not found'}, 404
@@ -423,7 +432,7 @@ class StudentDrivesResource(Resource):
             PlacementDrive.status == DriveStatus.ACTIVE
         ).all()
 
-        return {
+        result = {
             'drives': [{
                 'id': d.id,
                 'title': d.job_title,
@@ -431,7 +440,11 @@ class StudentDrivesResource(Resource):
                 'deadline': d.application_deadline.isoformat() if isinstance(d.application_deadline, datetime) else str(d.application_deadline),
                 'status': d.status
             } for d in drives]
-        }, 200   
+        }
+        
+        redis_client.setex(cache_key, 300, json.dumps(result))
+
+        return result, 200
     
 
 class StudentApplyResource(Resource):

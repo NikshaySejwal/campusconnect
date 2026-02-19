@@ -1,83 +1,139 @@
 <template>
-  <div class="page-wrapper">
-    <header class="main-header">
-      <nav class="container">
-        <div class="logo">CampusConnect</div>
-        <div class="nav-links">
-          <a href="/">Home</a>
-          <a href="/login">Login</a>
-        </div>
-      </nav>
-    </header>
+  <div class="register-page">
+    <div class="register-card">
+      <h2 class="card-title">Create an Account</h2>
 
-    <main class="container py-5">
-      <div class="row justify-content-center">
-        <div class="col-lg-6">
-          <div class="register-card">
-            <div v-if="!companyRegistrationPending">
-              <div class="card-header">
-                <h2 class="card-title">Create Your Account</h2>
-                <p class="card-subtitle">Join CampusConnect to unlock your future.</p>
-              </div>
-
-              <div class="card-body">
-                <div class="role-selector">
-                  <button :class="{ active: role === 'student' }" @click="role = 'student'">Student</button>
-                  <button :class="{ active: role === 'company' }" @click="role = 'company'">Company</button>
-                </div>
-
-                <form @submit.prevent="register">
-                  <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" v-model="email" class="form-control" required placeholder="your.email@university.edu">
-                  </div>
-                  <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" v-model="password" class="form-control" required placeholder="Create a strong password">
-                  </div>
-                  <button type="submit" class="submit-btn">Register as {{ role.charAt(0).toUpperCase() + role.slice(1) }}</button>
-                </form>
-              </div>
-
-              <div class="card-footer">
-                Already have an account? <router-link to="/login">Sign In</router-link>
-              </div>
-            </div>
-
-            <div v-else class="pending-approval">
-              <div class="card-body text-center">
-                <div class="approval-icon">&#128337;</div>
-                <h3 class="approval-title">Thank You for Registering!</h3>
-                <p class="approval-text">Your company profile is pending approval from the admin. You will be notified via email once your registration is confirmed.</p>
-                <router-link to="/login" class="btn btn-primary">Back to Login</router-link>
-              </div>
-            </div>
-
-          </div>
-        </div>
+      <!-- Role Selector -->
+      <div class="role-selector">
+        <button 
+          v-for="roleName in roles"
+          :key="roleName"
+          :class="{ active: selectedRole === roleName }"
+          @click="selectedRole = roleName">
+          {{ roleName }}
+        </button>
       </div>
-    </main>
+
+      <!-- Registration Form -->
+      <form v-if="!registrationComplete" @submit.prevent="handleRegister">
+        <!-- Common fields -->
+        <div class="form-group">
+          <label for="name">Full Name</label>
+          <input type="text" id="name" v-model="form.name" required placeholder="Your Name">
+        </div>
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" v-model="form.email" required placeholder="your.email@example.com">
+        </div>
+
+        <!-- Student-specific fields -->
+        <template v-if="selectedRole === 'Student'">
+          <div class="form-group">
+            <label for="usn">USN (University Seat Number)</label>
+            <input type="text" id="usn" v-model="form.usn" required placeholder="1AB23CD456">
+          </div>
+          <div class="form-group">
+            <label for="department">Department</label>
+            <input type="text" id="department" v-model="form.department" required placeholder="e.g., Computer Science">
+          </div>
+        </template>
+
+        <!-- Company-specific fields -->
+        <template v-if="selectedRole === 'Company'">
+          <div class="form-group">
+            <label for="company_name">Company Name</label>
+            <input type="text" id="company_name" v-model="form.company_name" required placeholder="Your Company Inc.">
+          </div>
+        </template>
+
+        <!-- Password -->
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" v-model="form.password" required placeholder="Choose a strong password">
+        </div>
+
+        <!-- Error Message -->
+        <div v-if="error" class="error-message">{{ error }}</div>
+
+        <button type="submit" class="btn btn-primary btn-block">Register</button>
+      </form>
+
+      <!-- Completion Message -->
+      <div v-else class="completion-view">
+        <h3>Thank you for registering!</h3>
+        <p v-if="selectedRole === 'Company'">Your company profile has been submitted and is now pending approval from the placement office.</p>
+        <router-link to="/login" class="btn btn-secondary">Return to Login</router-link>
+      </div>
+
+      <div class="login-link">
+        <p>Already have an account? <router-link to="/login">Sign In</router-link></p>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 export default {
+  name: "Register",
   data() {
     return {
-      role: 'student',
-      email: '',
-      password: '',
-      companyRegistrationPending: false,
+      roles: ["Student", "Company"],
+      selectedRole: "Student",
+      form: {
+        name: "",
+        email: "",
+        password: "",
+        usn: "",
+        department: "",
+        company_name: "",
+      },
+      error: null,
+      registrationComplete: false,
     };
   },
   methods: {
-    register() {
-      if (this.role === 'company') {
-        this.companyRegistrationPending = true;
-        console.log(`Company registration for ${this.email} is pending.`);
-      } else {
-        console.log(`Registering student ${this.email}`);
-        this.$router.push('/student-dashboard');
+    async handleRegister() {
+      this.error = null;
+      const payload = {
+        role: this.selectedRole,
+        name: this.form.name,
+        email: this.form.email,
+        password: this.form.password,
+      };
+
+      if (this.selectedRole === "Student") {
+        payload.usn = this.form.usn;
+        payload.department = this.form.department;
+      } else if (this.selectedRole === "Company") {
+        payload.company_name = this.form.company_name;
+      }
+
+      try {
+        const response = await fetch("/api/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "An error occurred during registration.");
+        }
+
+        if (this.selectedRole === "Student") {
+          // Auto-login student upon successful registration
+          localStorage.setItem("access_token", data.access_token);
+          localStorage.setItem("user", JSON.stringify(data.user));
+          window.dispatchEvent(new Event("storage"));
+          this.$router.push("/student/dashboard");
+        } else {
+          // Show completion message for company
+          this.registrationComplete = true;
+        }
+
+      } catch (err) {
+        this.error = err.message;
       }
     },
   },
@@ -85,99 +141,143 @@ export default {
 </script>
 
 <style scoped>
-.page-wrapper { background-color: #f8f9fa; min-height: 100vh; }
-.container { max-width: 960px; }
+/* Using similar styling to Login page for consistency */
+.register-page {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 4rem 2rem;
+  background-color: #f8f9fa;
+}
 
-/* Consistent Header */
-.main-header { background: white; border-bottom: 1px solid #dee2e6; padding: 1rem 0; }
-nav.container { display: flex; justify-content: space-between; align-items: center; }
-.logo { font-weight: 700; font-size: 1.5rem; color: #3F51B5; }
-.nav-links { display: flex; align-items: center; gap: 1.5rem; font-weight: 500; }
-.nav-links a { text-decoration: none; color: #212529; }
-
-/* Registration Card */
 .register-card {
-  background-color: white;
-  border-radius: 16px;
+  max-width: 480px;
+  width: 100%;
+  background: white;
+  padding: 2.5rem;
+  border-radius: 8px;
   border: 1px solid #dee2e6;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.07);
-  overflow: hidden;
 }
 
-.card-header, .card-body, .card-footer {
-  padding: 1.75rem;
-}
-
-.card-header {
+.card-title {
   text-align: center;
-  border-bottom: 1px solid #e9ecef;
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
 }
-.card-title { font-size: 1.75rem; font-weight: 700; color: #2c3e50; }
-.card-subtitle { font-size: 1rem; color: #6c757d; margin-top: 0.25rem; }
 
 .role-selector {
   display: flex;
-  background-color: #f1f3f5;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+  background-color: #e9ecef;
   border-radius: 8px;
   padding: 5px;
-  margin-bottom: 2rem;
-}
-.role-selector button {
-  flex: 1;
-  padding: 0.75rem;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border-radius: 6px;
-  color: #6c757d;
-  font-weight: 600;
-}
-.role-selector button.active {
-  background-color: #fff;
-  color: #3F51B5;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
-.form-group { margin-bottom: 1.5rem; }
+.role-selector button {
+  flex: 1;
+  padding: 0.75rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: #6c757d;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s ease-in-out;
+}
+
+.role-selector button.active {
+  background-color: #ffffff;
+  color: #3F51B5;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
 .form-group label {
   display: block;
   margin-bottom: 0.5rem;
-  font-weight: 600;
-  color: #343a40;
-}
-.form-control {
-  width: 100%;
-  padding: 12px 16px;
-  border: 1px solid #ced4da;
-  border-radius: 8px;
-  font-size: 1rem;
-  background-color: #f8f9fa;
+  font-weight: 500;
+  color: #495057;
 }
 
-.submit-btn {
+.form-group input {
   width: 100%;
-  padding: 14px;
+  padding: 0.75rem 1rem;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+.error-message {
+  color: #dc3545;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  padding: 0.75rem 1.25rem;
+  margin-bottom: 1rem;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.btn-block {
+  width: 100%;
+  padding: 0.85rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-top: 1rem;
+}
+
+.btn-primary {
   background-color: #3F51B5;
   color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
+}
+.btn-primary:hover {
+  background-color: #303f9f;
 }
 
-.card-footer {
-  background-color: #f8f9fa;
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+  text-decoration: none;
+  display: inline-block;
+}
+.btn-secondary:hover {
+  background-color: #5a6268;
+}
+
+.login-link {
   text-align: center;
-  border-top: 1px solid #e9ecef;
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
   color: #6c757d;
 }
-.card-footer a { color: #3F51B5; text-decoration: none; font-weight: 600; }
 
-/* Pending Approval State */
-.approval-icon { font-size: 3rem; color: #3F51B5; margin-bottom: 1rem; }
-.approval-title { font-size: 1.5rem; font-weight: 600; }
-.approval-text { color: #6c757d; margin-bottom: 2rem; }
-.btn-primary { background-color: #3F51B5; border: none; padding: 12px 24px; border-radius: 8px; }
+.login-link a {
+  color: #3F51B5;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.completion-view {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.completion-view h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.completion-view p {
+  color: #6c757d;
+  margin-bottom: 2rem;
+}
 </style>

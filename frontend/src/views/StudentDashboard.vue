@@ -41,7 +41,7 @@
                   <span>&#128197; Deadline: {{ drive.deadline }}</span>
                 </div>
               </div>
-              <button class="apply-btn">Apply Now</button>
+              <router-link :to="`/drive/${drive.id}`" class="apply-btn">View Details</router-link>
             </div>
           </div>
         </div>
@@ -51,25 +51,26 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 
-const availableDrives = ref([
-  {
-    id: 1, jobTitle: 'Software Development Engineer', company: 'Amazon', 
-    companyLogo: 'https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg', 
-    salary: '15-20 LPA', deadline: '2024-08-15',
-  },
-  {
-    id: 2, jobTitle: 'Frontend Engineer', company: 'Google', 
-    companyLogo: 'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg', 
-    salary: '18-22 LPA', deadline: '2024-08-20',
-  },
-  {
-    id: 3, jobTitle: 'Data Scientist', company: 'Microsoft', 
-    companyLogo: 'https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg', 
-    salary: '16-25 LPA', deadline: '2024-08-25',
-  },
-]);
+const availableDrives = ref([]);
+
+onMounted(async () => {
+  try {
+    const response = await fetch('http://localhost:5000/drives');
+    const data = await response.json();
+    availableDrives.value = data.drives.map(drive => ({
+      id: drive.id,
+      jobTitle: drive.title,
+      company: drive.company,
+      companyLogo: `https://logo.clearbit.com/${drive.company.toLowerCase().replace(/\s/g, '')}.com`,
+      salary: 'Not Disclosed', // Backend does not provide this yet
+      deadline: new Date(drive.deadline).toLocaleDateString(),
+    }));
+  } catch (error) {
+    console.error('Failed to fetch drives:', error);
+  }
+});
 </script>
 
 <style scoped>
@@ -133,5 +134,7 @@ nav.container { display: flex; justify-content: space-between; align-items: cent
   border-radius: 8px;
   cursor: pointer;
   margin-left: 1.5rem;
+  text-decoration: none;
+  text-align: center;
 }
 </style>
