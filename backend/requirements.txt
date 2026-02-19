@@ -1,8 +1,8 @@
-flask
-flask_restful
-flask_jwt_extended
+Flask
+Flask-RESTful
+Flask-JWT-Extended
 SQLAlchemy
-flask_cors
+Flask-Cors
 redis
 celery
 Flask-Mail
