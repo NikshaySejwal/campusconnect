@@ -37,7 +37,7 @@
                  <i :class="['h5', stat.icon, 'text-primary']"></i>
               </div>
               <div class="fs-4 fw-bold text-dark">{{ stat.value }}</div>
-              <p class="text-xs mt-1 mb-0" :class="stat.trendClass">{{ stat.trend }}</p>
+              <p class="text-xs mt-1 mb-0 text-muted">{{ stat.trend }}</p>
           </div>
         </div>
       </div>
@@ -69,12 +69,12 @@
                         <div class="content-stack mt-4">
                             <div v-for="company in pendingCompanies" :key="company.id" class="d-flex justify-content-between align-items-center p-3 border rounded-3 bg-light bg-opacity-50">
                                 <div>
-                                    <p class="fw-semibold text-dark mb-0">{{ company.companyName }}</p>
-                                    <p class="text-xs text-muted mb-0">{{ company.website }}</p>
+                                    <p class="fw-semibold text-dark mb-0">{{ company.company_name }}</p>
+                                    <p class="text-xs text-muted mb-0">{{ company.email }}</p>
                                 </div>
                                 <div class="d-flex gap-2">
-                                    <button @click="updateStatus(company.id, 'COMPANY', 'REJECTED')" class="btn btn-sm btn-outline-danger">Reject</button>
-                                    <button @click="updateStatus(company.id, 'COMPANY', 'APPROVED')" class="btn btn-sm btn-success">Approve</button>
+                                    <button @click="updateCompanyStatus(company.id, 'REJECTED')" class="btn btn-sm btn-outline-danger">Reject</button>
+                                    <button @click="updateCompanyStatus(company.id, 'APPROVED')" class="btn btn-sm btn-success">Approve</button>
                                 </div>
                             </div>
                             <div v-if="!pendingCompanies.length" class="text-center py-5 text-muted fst-italic">No pending applications.</div>
@@ -92,12 +92,12 @@
                         <div class="content-stack mt-4">
                             <div v-for="drive in pendingDrives" :key="drive.id" class="d-flex justify-content-between align-items-center p-3 border rounded-3 bg-light bg-opacity-50">
                                 <div>
-                                    <p class="fw-semibold text-dark mb-0">{{ drive.jobTitle }}</p>
-                                    <p class="text-xs text-muted mb-0">{{ drive.companyName }}</p>
+                                    <p class="fw-semibold text-dark mb-0">{{ drive.title }}</p>
+                                    <p class="text-xs text-muted mb-0">{{ drive.company }}</p>
                                 </div>
                                 <div class="d-flex gap-2">
-                                    <button @click="updateStatus(drive.id, 'DRIVE', 'REJECTED')" class="btn btn-sm btn-outline-danger">Reject</button>
-                                    <button @click="updateStatus(drive.id, 'DRIVE', 'APPROVED')" class="btn btn-sm btn-success">Approve</button>
+                                    <button @click="updateDriveStatus(drive.id, 'REJECTED')" class="btn btn-sm btn-outline-danger">Reject</button>
+                                    <button @click="updateDriveStatus(drive.id, 'APPROVED')" class="btn btn-sm btn-success">Approve</button>
                                 </div>
                             </div>
                             <div v-if="!pendingDrives.length" class="text-center py-5 text-muted fst-italic">No pending drive requests.</div>
@@ -136,7 +136,7 @@
                     <span class="badge fw-semibold border border-light-subtle text-dark">{{ user.role }}</span>
                   </td>
                   <td class="px-4 py-3">
-                    <span :class="[
+                     <span :class="[
                         'badge fw-semibold',
                         user.is_blacklisted ? 'bg-danger-soft text-danger' : 'bg-success-soft text-success'
                       ]"
@@ -144,7 +144,7 @@
                       {{ user.is_blacklisted ? 'Blacklisted' : 'Active' }}
                     </span>
                   </td>
-                  <td class="px-4 py-3 text-end">
+                  <td v-if="user.role === 'Student'" class="px-4 py-3 text-end">
                     <button @click="toggleBlacklist(user)" class="btn btn-link text-danger text-decoration-none fw-semibold p-0 text-xs">
                       <i class="bi bi-slash-circle me-1"></i>
                       {{ user.is_blacklisted ? 'Un-blacklist' : 'Blacklist' }}
@@ -161,47 +161,110 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 
 const activeTab = ref('Approvals');
 const search = ref('');
-const pendingCompanies = ref([
-  { id: '1', companyName: 'Amazon', website: 'https://amazon.jobs' },
-]);
-const pendingDrives = ref([
-  { id: '1', jobTitle: 'AWS Solutions Architect', companyName: 'Amazon' }
-]);
-const users = ref([
-  { id: '1', name: 'John Doe', email: 'john@insti.edu', role: 'Student', is_blacklisted: false },
-  { id: '2', name: 'Innovate Corp', email: 'contact@innovate.com', role: 'Company', is_blacklisted: true }
-]);
 
-const stats = [
-  { label: 'Total Students', value: '1,248', trend: 'Batch 2025', trendClass: 'text-muted', icon: 'bi-people' },
-  { label: 'Active Companies', value: '86', trend: 'Approved partners', trendClass: 'text-success fw-medium', icon: 'bi-building' },
-  { label: 'Active Drives', value: '24', trend: '1 pending', trendClass: 'text-warning fw-medium', icon: 'bi-briefcase' },
-  { label: 'Placement %', value: '76.4%', trend: 'Target: 90%', trendClass: 'text-muted', icon: 'bi-bar-chart-line' },
-];
+const stats = ref([]);
+const allCompanies = ref([]);
+const allDrives = ref([]);
+const allStudents = ref([]);
 
-const generateReport = () => {
-  alert('Generating monthly placement activity report...');
-};
+const pendingCompanies = computed(() => allCompanies.value.filter(c => c.approval_status === 'PENDING'));
+const pendingDrives = computed(() => allDrives.value.filter(d => d.status === 'PENDING'));
 
-const updateStatus = async (id, type, status) => {
-  console.log(`Updating ${type} ${id} to ${status}`);
-};
-
-const toggleBlacklist = async (user) => {
-  console.log(`Moderating user: ${user.name}`);
-  user.is_blacklisted = !user.is_blacklisted;
-};
+const users = computed(() => {
+  const students = allStudents.value.map(s => ({ ...s, role: 'Student' }));
+  const companies = allCompanies.value.map(c => ({ ...c, name: c.company_name, role: 'Company' }));
+  return [...students, ...companies];
+});
 
 const filteredUsers = computed(() => {
-  return users.value.filter(u => 
-    u.name.toLowerCase().includes(search.value.toLowerCase()) || 
+  return users.value.filter(u =>
+    u.name.toLowerCase().includes(search.value.toLowerCase()) ||
     u.email.toLowerCase().includes(search.value.toLowerCase())
   );
 });
+
+const getAuthHeader = () => ({ 'Authorization': `Bearer ${localStorage.getItem('access_token')}` });
+
+const fetchData = async (url) => {
+  const response = await fetch(url, { headers: getAuthHeader() });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || data.msg || `Failed to fetch from ${url}`);
+  }
+  return data;
+};
+
+const postData = async (url, body) => {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || data.msg || `Failed to post to ${url}`);
+  }
+  return data;
+};
+
+const fetchAllData = async () => {
+  try {
+    const [statsData, companiesData, drivesData, studentsData] = await Promise.all([
+      fetchData('/api/admin/stats'),
+      fetchData('/api/admin/companies'),
+      fetchData('/api/admin/drives'),
+      fetchData('/api/admin/students'),
+    ]);
+
+    stats.value = [
+        { label: 'Total Students', value: statsData.total_students, trend: 'Batch 2025', icon: 'bi-people' },
+        { label: 'Active Companies', value: statsData.active_companies, trend: 'Approved partners', icon: 'bi-building' },
+        { label: 'Active Drives', value: statsData.active_drives, trend: `${statsData.total_drives - statsData.active_drives} pending`, icon: 'bi-briefcase' },
+        { label: 'Placement %', value: `${statsData.placements}%`, trend: 'Target: 90%', icon: 'bi-bar-chart-line' },
+    ];
+    allCompanies.value = companiesData.companies;
+    allDrives.value = drivesData.drives;
+    allStudents.value = studentsData.students;
+
+  } catch (error) {
+    console.error('Dashboard Error:', error);
+    // Maybe redirect to login if auth fails
+  }
+};
+
+const updateCompanyStatus = async (id, status) => {
+  try {
+    await postData(`/api/admin/company/${id}/status`, { status });
+    await fetchAllData(); // Refresh
+  } catch (error) {
+    console.error('Error updating company status:', error);
+  }
+};
+
+const updateDriveStatus = async (id, status) => {
+  try {
+    await postData(`/api/admin/drive/${id}/status`, { status });
+    await fetchAllData();
+  } catch (error) {
+    console.error('Error updating drive status:', error);
+  }
+};
+
+const toggleBlacklist = async (user) => {
+  try {
+    await postData(`/api/admin/user/${user.id}/blacklist`, {});
+    await fetchAllData();
+  } catch (error) {
+    console.error('Error moderating user:', error);
+  }
+};
+
+onMounted(fetchAllData);
+
 </script>
 
 <style scoped>

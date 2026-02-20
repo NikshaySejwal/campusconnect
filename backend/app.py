@@ -1,58 +1,57 @@
-from flask import Flask
+import os
+from flask import Flask, request, send_from_directory
 from flask_restful import Api, Resource
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
-from models import Base, engine
+from werkzeug.utils import secure_filename
+from models import Base, engine, Users, UserRole, StudentProfile
 from flask_cors import CORS
 from sqlalchemy.orm import sessionmaker
 from celery_app import init_celery
-from tasks import student_csv_export
 
+# --- App Initialization ---
 app = Flask(__name__)
 CORS(app)
-
-# Add to app config
-app.config['CELERY_BROKER_URL'] = 'redis://localhost:6379/0'
-app.config['CELERY_RESULT_BACKEND'] = 'redis://localhost:6379/0'
-
-# Initialize
-celery_app = init_celery(app)
-
-Base.metadata.create_all(engine)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-#jwt config
-app.config['JWT_SECRET_KEY'] = 'your-secret-key-here'  # Change this to a secure secret key in production
-jwt = JWTManager(app)
 api = Api(app)
 
+# --- App Configuration ---
+app.config['JWT_SECRET_KEY'] = 'your-secret-key-here' 
+app.config['CELERY_BROKER_URL'] = 'redis://localhost:6379/0'
+app.config['CELERY_RESULT_BACKEND'] = 'redis://localhost:6379/0'
+app.config['UPLOAD_FOLDER'] = 'backend/uploads'
+app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
 
-#models
-from models import Users, UserRole,CompanyApprovalStatus,DriveStatus, CompanyProfile, StudentProfile, PlacementDrive, Application, PlacementStat
+# --- Services Initialization ---
+jwt = JWTManager(app)
+celery_app = init_celery(app)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+db = SessionLocal()
 
 
-# ensure an admin user exists
-def seed_admin_user():
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    try:
-        # use filter with expression (or filter_by with keyword)
-        if not session.query(Users).filter(Users.role == UserRole.Admin).first():
-            admin_user = Users(
-                name='Admin',
-                email="admin@mad2.com",
-                password="admin123",
-                role=UserRole.Admin,
-            )
-            session.add(admin_user)
-            session.commit()
-    finally:
-        session.close()
+# --- Database Initialization & Seeding ---
+def init_db():
+    Base.metadata.create_all(engine)
+    # Seed admin user if it doesn't exist
+    if not db.query(Users).filter(Users.role == UserRole.Admin).first():
+        admin_user = Users(
+            name='Admin',
+            email="admin@mad2.com",
+            password="admin123",
+            role=UserRole.Admin,
+        )
+        db.add(admin_user)
+        db.commit()
 
-# run seeding at startup
-seed_admin_user()
+init_db()
 
-# Resources from contollers.py
+
+# --- Helper Functions ---
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+
+
+# --- Resources ---
+from tasks import student_csv_export
 from contollers import (
     RegisterResource, LoginResource, CompaniesList, CompanyStatusResource,
     DrivesListResource, DriveStatusResource, StudentListResource, UserBlacklistResource,
@@ -61,6 +60,47 @@ from contollers import (
     StudentProfileResource, StudentDrivesResource, StudentApplyResource, StudentApplicationsResource,
     PublicDrivesResource, PublicDriveResource
 )
+
+class AvatarUploadResource(Resource):
+    @jwt_required()
+    def post(self):
+        user_id = get_jwt_identity()
+        student_profile = db.query(StudentProfile).filter_by(user_id=user_id).first()
+
+        if not student_profile:
+            return {'message': 'Student profile not found'}, 404
+        
+        if 'file' not in request.files:
+            return {'message': 'No file part'}, 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return {'message': 'No selected file'}, 400
+            
+        if file and allowed_file(file.filename):
+            # Create a secure, unique filename
+            filename = f"avatar_{user_id}_{secure_filename(file.filename)}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            
+            # Delete old avatar if it exists
+            if student_profile.avatar_url:
+                try:
+                    old_path = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(student_profile.avatar_url))
+                    if os.path.exists(old_path):
+                        os.remove(old_path)
+                except Exception as e:
+                    print(f"Error deleting old avatar: {e}") # Log error
+
+            file.save(filepath)
+            
+            # The URL should be relative to the server root
+            avatar_url = f'/uploads/{filename}'
+            student_profile.avatar_url = avatar_url
+            db.commit()
+            
+            return {'message': 'Avatar updated successfully', 'avatar_url': avatar_url}, 200
+        else:
+            return {'message': 'File type not allowed'}, 400
 
 class StudentExport(Resource):
     @jwt_required()
@@ -72,36 +112,48 @@ class StudentExport(Resource):
         task = student_csv_export.delay(student_id)
         return {'task_id': task.id, 'status': 'processing'}, 202
 
-# Register all the routes
+
+# --- API Routes ---
 api.add_resource(RegisterResource, '/register')
 api.add_resource(LoginResource, '/login')
 
-# Company routes
-api.add_resource(CompaniesList, '/admin/companies')
-api.add_resource(CompanyStatusResource, '/admin/company/<int:company_id>/status')
+# Public Routes
+api.add_resource(PublicDrivesResource, '/drives')
+api.add_resource(PublicDriveResource, '/drive/<int:drive_id>')
+
+# Student Routes
+api.add_resource(StudentProfileResource, '/student/profile')
+api.add_resource(StudentDrivesResource, '/student/drives')
+api.add_resource(StudentApplyResource, '/student/drive/<int:drive_id>/apply')
+api.add_resource(StudentApplicationsResource, '/student/applications')
+api.add_resource(StudentExport, '/student/export/<int:student_id>')
+api.add_resource(AvatarUploadResource, '/student/avatar') # New avatar upload route
+
+# Company Routes
 api.add_resource(CompanyProfileResource, '/company/profile')
 api.add_resource(CompanyDrivesResource, '/company/drives')
 api.add_resource(CompanyDriveApplicationsResource, '/company/drive/<int:drive_id>/applications')
 api.add_resource(CompanyApplicationStatusResource, '/company/application/<int:application_id>/status')
 
-# Placement drive routes
-api.add_resource(DrivesListResource, '/admin/drives')
-api.add_resource(DriveStatusResource, '/admin/drive/<int:drive_id>/status')
-api.add_resource(StudentDrivesResource, '/student/drives')
-api.add_resource(PublicDrivesResource, '/drives')
-api.add_resource(PublicDriveResource, '/drive/<int:drive_id>')
-
-# Student routes
-api.add_resource(StudentListResource, '/admin/students')
-api.add_resource(StudentProfileResource, '/student/profile')
-api.add_resource(StudentApplyResource, '/student/drive/<int:drive_id>/apply')
-api.add_resource(StudentApplicationsResource, '/student/applications')
-api.add_resource(StudentExport, '/api/student/export/<int:student_id>')
-
-# Admin routes
-api.add_resource(UserBlacklistResource, '/admin/user/<int:user_id>/blacklist')
+# Admin Routes
 api.add_resource(AdminStatsResource, '/admin/stats')
 api.add_resource(AdminSearchResource, '/admin/search')
+api.add_resource(CompaniesList, '/admin/companies')
+api.add_resource(CompanyStatusResource, '/admin/company/<int:company_id>/status')
+api.add_resource(DrivesListResource, '/admin/drives')
+api.add_resource(DriveStatusResource, '/admin/drive/<int:drive_id>/status')
+api.add_resource(StudentListResource, '/admin/students')
+api.add_resource(UserBlacklistResource, '/admin/user/<int:user_id>/blacklist')
 
+
+# --- Static File Serving ---
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+
+# --- Main Execution ---
 if __name__ == '__main__':
+    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+        os.makedirs(app.config['UPLOAD_FOLDER'])
     app.run(debug=True, port=5000)

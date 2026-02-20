@@ -95,7 +95,7 @@ export default {
     async handleRegister() {
       this.error = null;
       const payload = {
-        role: this.selectedRole,
+        role: this.selectedRole.toUpperCase(), // Match backend enum
         name: this.form.name,
         email: this.form.email,
         password: this.form.password,

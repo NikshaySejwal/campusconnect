@@ -1,5 +1,6 @@
 <template>
   <div class="application-history-page">
+    <!-- Navbar can be added here if needed -->
     <div class="container py-5">
       <div class="row justify-content-center">
         <div class="col-lg-9">
@@ -17,9 +18,9 @@
                 <div class="d-flex flex-column flex-md-row justify-content-between">
                   <!-- Job Details -->
                   <div class="mb-3 mb-md-0">
-                    <h5 class="fw-bold mb-1">{{ application.jobTitle }}</h5>
-                    <p class="text-muted fw-semibold mb-2">{{ application.company }}</p>
-                    <p class="text-xs text-muted mb-0">Applied on {{ application.appliedDate }}</p>
+                    <h5 class="fw-bold mb-1">{{ application.drive.title }}</h5>
+                    <p class="text-muted fw-semibold mb-2">{{ application.drive.company.name }}</p>
+                    <p class="text-xs text-muted mb-0">Applied on {{ new Date(application.applied_on).toLocaleDateString() }}</p>
                   </div>
                   <!-- Status -->
                   <div class="d-flex align-items-center justify-content-end">
@@ -29,9 +30,16 @@
               </div>
             </div>
 
-             <div v-if="!applications.length" class="text-center py-5 text-muted fst-italic">
-                  You have not applied to any drives yet.
-              </div>
+            <div v-if="!applications.length && !isLoading" class="text-center py-5 text-muted fst-italic">
+                You have not applied to any drives yet.
+            </div>
+
+            <div v-if="isLoading" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+
           </div>
 
         </div>
@@ -41,37 +49,36 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 
-const applications = ref([
-  {
-    id: 1,
-    jobTitle: 'Software Development Engineer',
-    company: 'Amazon',
-    appliedDate: '2024-07-28',
-    status: 'Under Review',
-  },
-  {
-    id: 2,
-    jobTitle: 'Product Manager Intern',
-    company: 'Innovate Corp',
-    appliedDate: '2024-07-25',
-    status: 'Shortlisted',
-  },
-  {
-    id: 3,
-    jobTitle: 'Data Analyst',
-    company: 'Analytics Inc.',
-    appliedDate: '2024-07-22',
-    status: 'Rejected',
-  },
-]);
+const applications = ref([]);
+const isLoading = ref(true);
+
+const getAuthHeader = () => ({
+  'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+});
+
+const fetchApplications = async () => {
+  isLoading.value = true;
+  try {
+    const response = await fetch('/api/student/applications', { headers: getAuthHeader() });
+    if (!response.ok) throw new Error('Failed to fetch applications');
+    const data = await response.json();
+    applications.value = data.applications;
+  } catch (error) {
+    console.error('Error fetching applications:', error);
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+onMounted(fetchApplications);
 
 const getStatusClass = (status) => {
   const map = {
-    'Under Review': 'bg-warning-soft text-warning',
-    Shortlisted: 'bg-success-soft text-success',
-    Rejected: 'bg-danger-soft text-danger',
+    PENDING: 'bg-warning-soft text-warning',
+    SHORTLISTED: 'bg-success-soft text-success',
+    REJECTED: 'bg-danger-soft text-danger',
   };
   return map[status];
 };
@@ -95,6 +102,7 @@ const getStatusClass = (status) => {
   padding: .5em .8em;
   font-weight: 600;
   letter-spacing: .5px;
+  text-transform: capitalize;
 }
 
 .badge.bg-success-soft {

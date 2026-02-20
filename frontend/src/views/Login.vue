@@ -78,7 +78,7 @@ export default {
           body: JSON.stringify({
             email: this.email,
             password: this.password,
-            role: this.selectedRole,
+            role: this.selectedRole.toUpperCase(), // Match backend enum
           }),
         });
 
@@ -95,20 +95,8 @@ export default {
         // Manually trigger storage event for navbar update
         window.dispatchEvent(new Event("storage"));
 
-        // Redirect to the appropriate dashboard
-        switch (data.user.role) {
-          case "Admin":
-            this.$router.push("/admin/dashboard");
-            break;
-          case "Company":
-            this.$router.push("/company/dashboard");
-            break;
-          case "Student":
-            this.$router.push("/student/dashboard");
-            break;
-          default:
-            this.$router.push("/");
-        }
+        // Redirect to landing, router guard will handle the rest
+        this.$router.push("/");
 
       } catch (err) {
         this.error = err.message;

@@ -4,9 +4,9 @@
       <nav class="container">
         <div class="logo">CampusConnect</div>
         <div class="nav-links">
-          <a href="/student-dashboard">Dashboard</a>
-          <a href="/applications">My Applications</a>
-          <a href="/profile/1">My Profile</a>
+          <router-link :to="{ name: 'StudentDashboard' }">Dashboard</router-link>
+          <router-link :to="{ name: 'ApplicationHistory' }">My Applications</router-link>
+          <router-link :to="{ name: 'StudentProfile' }">My Profile</router-link>
         </div>
       </nav>
     </header>
@@ -15,12 +15,12 @@
       <!-- Header -->
       <div class="page-header-container">
         <div>
-          <h1 class="welcome-title">Welcome, John!</h1>
+          <h1 class="welcome-title">Welcome, {{ studentName || 'Student' }}!</h1>
           <p class="welcome-subtitle">Explore and apply to the latest placement drives from top companies.</p>
         </div>
         <div class="header-buttons">
-          <router-link to="/profile/1" class="header-btn">My Profile</router-link>
-          <router-link to="/applications" class="header-btn">My Applications</router-link>
+          <router-link :to="{ name: 'StudentProfile' }" class="header-btn">My Profile</router-link>
+          <router-link :to="{ name: 'ApplicationHistory' }" class="header-btn">My Applications</router-link>
         </div>
       </div>
 
@@ -31,17 +31,17 @@
           <div v-for="drive in availableDrives" :key="drive.id" class="drive-card">
             <div class="card-content">
               <div class="company-logo-wrapper">
-                <img :src="drive.companyLogo" :alt="drive.company" class="company-logo">
+                <img :src="`https://logo.clearbit.com/${drive.company.name.toLowerCase().replace(/\s/g, '')}.com`" :alt="drive.company.name" class="company-logo">
               </div>
               <div class="drive-details">
-                <h5 class="job-title">{{ drive.jobTitle }}</h5>
-                <p class="company-name">{{ drive.company }}</p>
+                <h5 class="job-title">{{ drive.title }}</h5>
+                <p class="company-name">{{ drive.company.name }}</p>
                 <div class="drive-meta">
                   <span>&#128176; {{ drive.salary }}</span>
-                  <span>&#128197; Deadline: {{ drive.deadline }}</span>
+                  <span>&#128197; Deadline: {{ new Date(drive.deadline).toLocaleDateString() }}</span>
                 </div>
               </div>
-              <router-link :to="`/drive/${drive.id}`" class="apply-btn">View Details</router-link>
+              <router-link :to="{ name: 'DriveDetails', params: { id: drive.id } }" class="apply-btn">View Details</router-link>
             </div>
           </div>
         </div>
@@ -51,25 +51,56 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 
+const student = ref(null);
 const availableDrives = ref([]);
 
-onMounted(async () => {
-  try {
-    const response = await fetch('http://localhost:5000/drives');
-    const data = await response.json();
-    availableDrives.value = data.drives.map(drive => ({
-      id: drive.id,
-      jobTitle: drive.title,
-      company: drive.company,
-      companyLogo: `https://logo.clearbit.com/${drive.company.toLowerCase().replace(/\s/g, '')}.com`,
-      salary: 'Not Disclosed', // Backend does not provide this yet
-      deadline: new Date(drive.deadline).toLocaleDateString(),
-    }));
-  } catch (error) {
-    console.error('Failed to fetch drives:', error);
+const studentName = computed(() => {
+  if (student.value) {
+    return student.value.name;
   }
+  const storedUser = localStorage.getItem('user');
+  if (storedUser) {
+    return JSON.parse(storedUser).name;
+  }
+  return 'Student';
+});
+
+const getAuthHeader = () => ({ 'Authorization': `Bearer ${localStorage.getItem('access_token')}` });
+
+const fetchStudentProfile = async () => {
+  try {
+    const response = await fetch('/api/student/profile', { headers: getAuthHeader() });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || data.msg || 'Failed to fetch student profile');
+    }
+    student.value = data;
+  } catch (error) {
+    console.error('Error fetching student profile:', error);
+  }
+};
+
+const fetchAvailableDrives = async () => {
+    try {
+        const response = await fetch('/api/student/drives', { headers: getAuthHeader() });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || data.msg || 'Failed to fetch drives');
+        }
+        availableDrives.value = data.drives.map(drive => ({
+            ...drive,
+            salary: drive.salary || 'Not Disclosed',
+        }));
+    } catch (error) {
+        console.error('Failed to fetch drives:', error);
+    }
+};
+
+onMounted(async () => {
+  await fetchStudentProfile();
+  await fetchAvailableDrives();
 });
 </script>
 

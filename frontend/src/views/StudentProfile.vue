@@ -4,24 +4,29 @@
       <nav class="container">
         <div class="logo">CampusConnect</div>
         <div class="nav-links">
-          <a href="/student-dashboard">Dashboard</a>
-          <a href="/applications">My Applications</a>
-          <a href="/profile/1">My Profile</a>
+          <router-link :to="{ name: 'StudentDashboard' }">Dashboard</router-link>
+          <router-link :to="{ name: 'ApplicationHistory' }">My Applications</router-link>
+          <router-link :to="{ name: 'StudentProfile' }">My Profile</router-link>
         </div>
       </nav>
     </header>
 
     <main class="container py-5">
-      <div class="profile-card">
+      <div v-if="student" class="profile-card">
         <!-- Profile Header -->
         <div class="profile-header">
           <div class="avatar-wrapper">
-            <img :src="`https://i.pravatar.cc/150?u=${student.id}`" alt="Profile Picture" class="avatar">
+            <img :src="fullAvatarUrl" alt="Profile Picture" class="avatar">
+            <div class="avatar-overlay" @click="triggerFileInput">
+              <i class="bi bi-camera"></i>
+              <span>Change Picture</span>
+            </div>
+            <input type="file" ref="fileInput" @change="handleFileChange" style="display: none" accept="image/*">
           </div>
           <div class="header-info">
             <h2 class="student-name">{{ student.name }}</h2>
             <p class="student-email">{{ student.email }}</p>
-            <p v-if="!isEditing" class="student-bio">{{ student.bio }}</p>
+            <p v-if="!isEditing" class="student-bio">{{ student.bio || 'No bio provided.' }}</p>
           </div>
           <div class="header-actions">
             <button v-if="!isEditing" @click="isEditing = true" class="btn-edit">Edit Profile</button>
@@ -53,9 +58,9 @@
                   <strong v-else>{{ student.cgpa }}</strong>
                 </li>
                 <li>
-                  <span>Graduation</span>
-                  <input v-if="isEditing" type="text" class="form-control-sm" v-model="editableStudent.graduationYear">
-                  <strong v-else>{{ student.graduationYear }}</strong>
+                  <span>Graduation Year</span>
+                  <input v-if="isEditing" type="text" class="form-control-sm" v-model="editableStudent.graduation_year">
+                  <strong v-else>{{ student.graduation_year }}</strong>
                 </li>
               </ul>
             </div>
@@ -66,7 +71,7 @@
               <div v-if="isEditing" class="skills-editor">
                 <input type="text" class="form-control" v-model="editableStudent.skills" placeholder="Comma-separated skills">
               </div>
-              <div v-else class="skills-tags">
+              <div v-else-if="student.skills" class="skills-tags">
                 <span v-for="skill in student.skills.split(',')" :key="skill" class="skill-tag">
                   {{ skill.trim() }}
                 </span>
@@ -75,32 +80,110 @@
           </div>
         </div>
       </div>
+      <div v-else class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-3">Loading Profile...</p>
+      </div>
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted, computed } from 'vue';
 
 const isEditing = ref(false);
-const student = ref({
-  id: '1', name: 'John Doe', email: 'john.doe@example.com',
-  bio: 'Passionate developer with a knack for creating elegant and efficient solutions. Eager to contribute to a challenging and innovative team.',
-  branch: 'Computer Science', cgpa: 8.8, graduationYear: 2025,
-  skills: 'Vue.js, Node.js, Python, SQL, Docker',
-});
+const student = ref(null);
 const editableStudent = ref(null);
+const fileInput = ref(null);
 
-watch(isEditing, (isEditing) => {
-  if (isEditing) editableStudent.value = { ...student.value };
+const fullAvatarUrl = computed(() => {
+  if (student.value?.avatar_url) {
+    return student.value.avatar_url;
+  }
+  return `https://i.pravatar.cc/150`;
 });
 
-const saveProfile = () => {
-  student.value = { ...editableStudent.value };
-  isEditing.value = false;
+const getAuthHeader = (isMultipart = false) => {
+    const headers = { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` };
+    if (!isMultipart) {
+        headers['Content-Type'] = 'application/json';
+    }
+    return headers;
 };
 
-const cancelEdit = () => { isEditing.value = false; };
+const fetchStudentProfile = async () => {
+  try {
+    const response = await fetch('/api/student/profile', { headers: getAuthHeader() });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || data.msg || `Failed to fetch profile: ${response.statusText}`);
+    }
+    student.value = data;
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+  }
+};
+
+onMounted(fetchStudentProfile);
+
+watch(student, (newStudent) => {
+  if (newStudent) {
+    editableStudent.value = { ...newStudent };
+  }
+});
+
+const saveProfile = async () => {
+  try {
+    const response = await fetch('/api/student/profile', {
+      method: 'PUT',
+      headers: getAuthHeader(),
+      body: JSON.stringify(editableStudent.value),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || data.msg || 'Failed to save profile');
+    }
+    await fetchStudentProfile();
+    isEditing.value = false;
+  } catch (error) {
+    console.error('Error saving profile:', error);
+  }
+};
+
+const cancelEdit = () => {
+    editableStudent.value = { ...student.value };
+    isEditing.value = false;
+};
+
+const triggerFileInput = () => {
+    fileInput.value.click();
+};
+
+const handleFileChange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch('/api/student/avatar', {
+            method: 'POST',
+            headers: getAuthHeader(true),
+            body: formData,
+        });
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.message || data.msg || 'Failed to upload avatar');
+        }
+        await fetchStudentProfile();
+    } catch (error) {
+        console.error('Error uploading avatar:', error);
+    }
+};
+
 </script>
 
 <style scoped>
@@ -120,8 +203,41 @@ nav.container { display: flex; justify-content: space-between; align-items: cent
 .profile-header {
   display: flex; align-items: flex-start; padding: 2rem; border-bottom: 1px solid #e9ecef;
 }
-.avatar-wrapper { margin-right: 1.5rem; }
-.avatar { width: 100px; height: 100px; border-radius: 50%; }
+.avatar-wrapper { 
+    margin-right: 1.5rem; 
+    position: relative; 
+    cursor: pointer;
+}
+.avatar { 
+    width: 100px; 
+    height: 100px; 
+    border-radius: 50%; 
+    object-fit: cover; 
+    display: block;
+}
+
+.avatar-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background-color: rgba(0,0,0,0.5);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+.avatar-wrapper:hover .avatar-overlay {
+    opacity: 1;
+}
+.avatar-overlay i { font-size: 1.5rem; }
+.avatar-overlay span { font-size: 0.8rem; margin-top: 0.25rem; }
+
 .header-info { flex-grow: 1; }
 .student-name { font-size: 2rem; font-weight: 700; margin-bottom: 0.25rem; }
 .student-email { color: #6c757d; margin-bottom: 0.75rem; }

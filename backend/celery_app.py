@@ -19,20 +19,4 @@ celery_app = None
 def init_celery(app):
     global celery_app
     celery_app = make_celery(app)
-    
-    @celery_app.task
-    def daily_reminders():
-        """Daily deadline reminders"""
-        pass  # Send emails/SMS
-    
-    @celery_app.task
-    def monthly_report():
-        """Monthly admin report"""
-        pass
-    
-    @celery_app.task
-    def export_csv(student_id):
-        """Student application CSV export"""
-        pass
-    
     return celery_app

@@ -1,6 +1,6 @@
 from enum import Enum as pyEnum
 from sqlalchemy import Enum, create_engine, Column, Integer, String, Float, Text, DateTime, Boolean, ForeignKey, func
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from datetime import datetime
 
 
@@ -60,10 +60,11 @@ class CompanyProfile(Base):
 class StudentProfile(Base):
     __tablename__ = 'student_profiles'
     user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
-    branch = Column(String(50), nullable=False)
-    cgpa = Column(Float, nullable=False)
-    graduation_year = Column(Integer)
-    skills = Column(Text)  # Json String or comma-separated
+    roll_no = Column(String(50), unique=True)  # Changed from usn
+    branch = Column(String(50), nullable=True) # make nullable
+    cgpa = Column(Float, nullable=True) # make nullable
+    graduation_year = Column(Integer, nullable=True) # make nullable
+    skills = Column(Text, nullable=True)  # make nullable
 
 
 class PlacementDrive(Base):
@@ -112,3 +113,5 @@ class PlacementStat(Base):
 
 # Export engine for use in other modules
 engine = create_engine('sqlite:///campus_connect.db')
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
