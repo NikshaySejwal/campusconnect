@@ -53,6 +53,7 @@ class CompanyProfile(Base):
     __tablename__ = 'company_profiles'
     user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
     company_name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
     hr_contact = Column(String(100))
     approval_status = Column(Enum(CompanyApprovalStatus), default=CompanyApprovalStatus.PENDING)
 

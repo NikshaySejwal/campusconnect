@@ -9,6 +9,7 @@ import ApplicationHistory from '../views/ApplicationHistory.vue';
 import StudentProfile from '../views/StudentProfile.vue';
 import StudentDashboard from '../views/StudentDashboard.vue';
 import DriveDetails from '../views/DriveDetails.vue';
+import DriveApplicants from '../views/DriveApplicants.vue';
 
 const routes = [
   { path: '/', name: 'Landing', component: Landing },
@@ -30,6 +31,12 @@ const routes = [
     path: '/company/drive/create', 
     name: 'CreateDrive', 
     component: CreateDrive, 
+    meta: { requiresAuth: true, role: 'COMPANY' } 
+  },
+  { 
+    path: '/company/drive/:id/applicants', 
+    name: 'DriveApplicants', 
+    component: DriveApplicants, 
     meta: { requiresAuth: true, role: 'COMPANY' } 
   },
   { 

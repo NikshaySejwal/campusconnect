@@ -27,23 +27,26 @@
       <!-- Available Drives -->
       <div class="drives-section">
         <h4 class="section-title">Available Drives</h4>
-        <div class="drives-grid">
+        <div v-if="availableDrives.length" class="drives-grid">
           <div v-for="drive in availableDrives" :key="drive.id" class="drive-card">
             <div class="card-content">
               <div class="company-logo-wrapper">
-                <img :src="`https://logo.clearbit.com/${drive.company.name.toLowerCase().replace(/\s/g, '')}.com`" :alt="drive.company.name" class="company-logo">
+                <img :src="`https://logo.clearbit.com/${drive.company.toLowerCase().replace(/ /g, '')}.com`" :alt="drive.company" class="company-logo">
               </div>
               <div class="drive-details">
                 <h5 class="job-title">{{ drive.title }}</h5>
-                <p class="company-name">{{ drive.company.name }}</p>
+                <p class="company-name">{{ drive.company }}</p>
                 <div class="drive-meta">
-                  <span>&#128176; {{ drive.salary }}</span>
                   <span>&#128197; Deadline: {{ new Date(drive.deadline).toLocaleDateString() }}</span>
                 </div>
               </div>
               <router-link :to="{ name: 'DriveDetails', params: { id: drive.id } }" class="apply-btn">View Details</router-link>
             </div>
           </div>
+        </div>
+        <div v-else class="text-center py-5 text-muted fst-italic">
+          <p>No placement drives are currently available for you.</p>
+          <p>This may be because no drives match your profile, or no drives have been approved yet.</p>
         </div>
       </div>
     </main>
@@ -89,10 +92,7 @@ const fetchAvailableDrives = async () => {
         if (!response.ok) {
             throw new Error(data.message || data.msg || 'Failed to fetch drives');
         }
-        availableDrives.value = data.drives.map(drive => ({
-            ...drive,
-            salary: drive.salary || 'Not Disclosed',
-        }));
+        availableDrives.value = data.drives;
     } catch (error) {
         console.error('Failed to fetch drives:', error);
     }

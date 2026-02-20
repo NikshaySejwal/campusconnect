@@ -1,3 +1,4 @@
+
 from flask_restful import Resource, reqparse
 from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
@@ -184,9 +185,9 @@ class DrivesListResource(Resource):
             'drives': [{
                 'id': d.id,
                 'title': d.job_title,
-                'description': d.job_description,
                 'company': d.company.company_name if d.company else None,
                 'deadline': d.application_deadline.isoformat() if isinstance(d.application_deadline, datetime) else str(d.application_deadline),
+                'status': d.status.value # Add status to the response
             } for d in drives]
         }, 200
     
@@ -289,9 +290,9 @@ class CompanyProfileResource(Resource):
     @jwt_required()
     def get(self):
         user_id = int(get_jwt_identity())
-        company = db.query(CompanyProfile).filter(CompanyProfile.user_id == user_id, CompanyProfile.approval_status == CompanyApprovalStatus.APPROVED).first()
+        company = db.query(CompanyProfile).filter(CompanyProfile.user_id == user_id).first()
         if not company:
-            return {'message': 'Company profile not found or not approved'}, 403
+            return {'message': 'Company profile not found'}, 404
         return {
             'id': company.user_id,
             'company_name': company.company_name,

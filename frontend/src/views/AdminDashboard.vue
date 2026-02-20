@@ -172,6 +172,8 @@ const allDrives = ref([]);
 const allStudents = ref([]);
 
 const pendingCompanies = computed(() => allCompanies.value.filter(c => c.approval_status === 'PENDING'));
+
+// Correctly filter drives with a 'PENDING' status.
 const pendingDrives = computed(() => allDrives.value.filter(d => d.status === 'PENDING'));
 
 const users = computed(() => {
