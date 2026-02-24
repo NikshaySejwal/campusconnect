@@ -1,122 +1,134 @@
 <template>
-  <div class="page-wrapper">
-    <main class="container py-5">
-      <div v-if="drive">
-        <h1 class="page-title">Applicants for {{ drive.job_title }}</h1>
-        <p class="page-subtitle">Review and manage applications for this drive.</p>
-      </div>
-      <div v-else class="text-center">
-        <p>Loading drive details...</p>
-      </div>
+  <div class="container my-5">
+    <div v-if="drive">
+      <h1 class="mb-2">Applicants for {{ drive.title }}</h1>
+      <p class="text-muted mb-4">Review and manage applications for this drive.</p>
 
-      <div v-if="applications.length" class="table-responsive mt-5">
-        <table class="table table-hover align-middle">
-          <thead class="table-light">
-            <tr>
-              <th scope="col">Student Name</th>
-              <th scope="col">Application Date</th>
-              <th scope="col">Status</th>
-              <th scope="col">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="app in applications" :key="app.id">
-              <td>{{ app.student_name }}</td>
-              <td>{{ new Date(app.application_date).toLocaleDateString() }}</td>
-              <td>
-                <span class="badge" :class="statusBadge(app.status)">{{ app.status }}</span>
-              </td>
-              <td>
-                <div class="btn-group">
-                  <button @click="updateStatus(app.id, 'SHORTLISTED')" class="btn btn-sm btn-outline-success" :disabled="app.status === 'SHORTLISTED'">Shortlist</button>
-                  <button @click="updateStatus(app.id, 'REJECTED')" class="btn btn-sm btn-outline-danger" :disabled="app.status === 'REJECTED'">Reject</button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-       <div v-else-if="!isLoading" class="text-center py-5 border-top mt-4">
-        <p class="text-muted fst-italic">No applications have been submitted for this drive yet.</p>
-      </div>
-
-       <div v-if="isLoading" class="text-center py-5">
-        <div class="spinner-border text-primary" role="status">
-          <span class="visually-hidden">Loading...</span>
+      <div class="card">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="bg-light">
+              <tr>
+                <th class="px-4 py-3">Student Name</th>
+                <th class="px-4 py-3">Application Date</th>
+                <th class="px-4 py-3">Status</th>
+                <th class="px-4 py-3 text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="app in applications" :key="app.id">
+                <td class="px-4 py-3">{{ app.student_name }}</td>
+                <td class="px-4 py-3">{{ new Date(app.application_date).toLocaleDateString() }}</td>
+                <td class="px-4 py-3">
+                  <span :class="['badge', getStatusClass(app.status)]">{{ app.status }}</span>
+                </td>
+                <td class="px-4 py-3 text-end">
+                  <div class="d-flex gap-2 justify-content-end">
+                    <router-link :to="{ name: 'StudentProfileView', params: { id: app.student_id } }" class="btn btn-sm btn-outline-primary">View Profile</router-link>
+                    <button @click="updateStatus(app, 'HIRED')" class="btn btn-sm btn-success">Hired</button>
+                    <button @click="updateStatus(app, 'SHORTLISTED')" class="btn btn-sm btn-info">Shortlist</button>
+                    <button @click="updateStatus(app, 'REJECTED')" class="btn btn-sm btn-danger">Reject</button>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="!applications.length">
+                <td colspan="4" class="text-center text-muted fst-italic py-5">
+                  No applications received for this drive yet.
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
-
-      <div v-if="error" class="alert alert-danger mt-4">{{ error }}</div>
-
-    </main>
+    </div>
+    <div v-else class="text-center">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 const route = useRoute();
+const router = useRouter();
+
 const drive = ref(null);
 const applications = ref([]);
-const isLoading = ref(true);
-const error = ref(null);
-
-const driveId = route.params.id;
 
 const getAuthHeader = () => ({ 'Authorization': `Bearer ${localStorage.getItem('access_token')}` });
 
-const statusBadge = (status) => ({
-  'bg-success-soft text-success': status === 'SHORTLISTED',
-  'bg-danger-soft text-danger': status === 'REJECTED',
-  'bg-primary-soft text-primary': status === 'APPLIED',
-});
-
 const fetchDriveDetails = async () => {
   try {
-    const res = await fetch(`/api/company/drive/${driveId}/applications`, { headers: getAuthHeader() });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to fetch drive details.');
-    drive.value = { job_title: data.drive_title }; // Simplified for now
-    applications.value = data.applications;
-  } catch (err) {
-    error.value = err.message;
+    const response = await fetch(`/api/drive/${route.params.id}`, { headers: getAuthHeader() });
+    if (!response.ok) throw new Error('Failed to fetch drive details.');
+    drive.value = await response.json();
+  } catch (error) {
+    console.error('Error fetching drive details:', error);
   }
 };
 
-const updateStatus = async (applicationId, status) => {
+const fetchApplications = async () => {
   try {
-    const res = await fetch(`/api/company/application/${applicationId}/status`, {
+    const response = await fetch(`/api/company/drive/${route.params.id}/applications`, { headers: getAuthHeader() });
+    if (!response.ok) throw new Error('Failed to fetch applications.');
+    const data = await response.json();
+    applications.value = data.applications;
+  } catch (error) {
+    console.error('Error fetching applications:', error);
+    if (error.response && error.response.status === 401) {
+      router.push({ name: 'Login' });
+    }
+  }
+};
+
+const updateStatus = async (application, status) => {
+  try {
+    const response = await fetch(`/api/company/application/${application.id}/status`, {
       method: 'POST',
       headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to update status.');
-    
-    // Update local state
-    const index = applications.value.findIndex(app => app.id === applicationId);
-    if(index !== -1) {
-        applications.value[index].status = status;
-    }
-
-  } catch (err) {
-    error.value = `Failed to update status: ${err.message}`;
+    if (!response.ok) throw new Error('Failed to update status.');
+    await fetchApplications(); // Refresh the list
+  } catch (error) {
+    console.error('Error updating status:', error);
   }
 };
 
-onMounted(async () => {
-  isLoading.value = true;
-  await fetchDriveDetails();
-  isLoading.value = false;
+const getStatusClass = (status) => {
+  const statusMap = {
+    APPLIED: 'bg-primary-soft',
+    SHORTLISTED: 'bg-warning-soft text-dark',
+    HIRED: 'bg-success-soft',
+    REJECTED: 'bg-danger-soft'
+  };
+  return statusMap[status] || 'bg-light';
+};
+
+onMounted(() => {
+  fetchDriveDetails();
+  fetchApplications();
 });
 </script>
 
 <style scoped>
-.page-wrapper { background-color: #f8f9fa; min-height: 100vh; }
-.page-title { font-size: 2.2rem; font-weight: 700; }
-.page-subtitle { font-size: 1.1rem; color: #6c757d; }
-
+.container {
+  max-width: 1000px;
+}
+.table-hover tbody tr:hover {
+    background-color: #f8fafc;
+}
+.badge {
+  font-size: .85rem;
+  padding: .5em .9em;
+  border-radius: .25rem;
+  font-weight: 600;
+}
+.badge.bg-warning-soft { background-color: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
 .badge.bg-success-soft { background-color: #e6f9f0; color: #00875a; }
 .badge.bg-danger-soft { background-color: #fbeae5; color: #c53030; }
 .badge.bg-primary-soft { background-color: #e7e9fd; color: #3f51b5; }

@@ -14,7 +14,7 @@ CORS(app)
 api = Api(app)
 
 # --- App Configuration ---
-app.config['JWT_SECRET_KEY'] = 'your-secret-key-here' 
+app.config['JWT_SECRET_KEY'] = 'your-secret-key-here'
 app.config['CELERY_BROKER_URL'] = 'redis://localhost:6379/0'
 app.config['CELERY_RESULT_BACKEND'] = 'redis://localhost:6379/0'
 app.config['UPLOAD_FOLDER'] = 'backend/uploads'
@@ -25,6 +25,10 @@ jwt = JWTManager(app)
 celery_app = init_celery(app)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 db = SessionLocal()
+
+# --- Ensure upload directory exists ---
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
 
 
 # --- Database Initialization & Seeding ---
@@ -58,7 +62,8 @@ from contollers import (
     AdminStatsResource, AdminSearchResource, CompanyProfileResource, CompanyDrivesResource,
     CompanyDriveApplicationsResource, CompanyApplicationStatusResource,
     StudentProfileResource, StudentDrivesResource, StudentApplyResource, StudentApplicationsResource,
-    PublicDrivesResource, PublicDriveResource
+    PublicDrivesResource, PublicDriveResource, AdminCompanyResource, AdminDriveResource,
+    StudentProfileViewResource, StudentExportResource
 )
 
 class AvatarUploadResource(Resource):
@@ -80,12 +85,18 @@ class AvatarUploadResource(Resource):
         if file and allowed_file(file.filename):
             # Create a secure, unique filename
             filename = f"avatar_{user_id}_{secure_filename(file.filename)}"
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            
+            # Ensure the upload folder exists before saving
+            upload_folder = app.config['UPLOAD_FOLDER']
+            if not os.path.exists(upload_folder):
+                os.makedirs(upload_folder)
+                
+            filepath = os.path.join(upload_folder, filename)
             
             # Delete old avatar if it exists
             if student_profile.avatar_url:
                 try:
-                    old_path = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(student_profile.avatar_url))
+                    old_path = os.path.join(upload_folder, os.path.basename(student_profile.avatar_url))
                     if os.path.exists(old_path):
                         os.remove(old_path)
                 except Exception as e:
@@ -123,10 +134,11 @@ api.add_resource(PublicDriveResource, '/drive/<int:drive_id>')
 
 # Student Routes
 api.add_resource(StudentProfileResource, '/student/profile')
+api.add_resource(StudentProfileViewResource, '/student/<int:student_id>/profile')
 api.add_resource(StudentDrivesResource, '/student/drives')
 api.add_resource(StudentApplyResource, '/student/drive/<int:drive_id>/apply')
 api.add_resource(StudentApplicationsResource, '/student/applications')
-api.add_resource(StudentExport, '/student/export/<int:student_id>')
+api.add_resource(StudentExportResource, '/student/export')
 api.add_resource(AvatarUploadResource, '/student/avatar') # New avatar upload route
 
 # Company Routes
@@ -144,6 +156,8 @@ api.add_resource(DrivesListResource, '/admin/drives')
 api.add_resource(DriveStatusResource, '/admin/drive/<int:drive_id>/status')
 api.add_resource(StudentListResource, '/admin/students')
 api.add_resource(UserBlacklistResource, '/admin/user/<int:user_id>/blacklist')
+api.add_resource(AdminCompanyResource, '/admin/company/<int:company_id>')
+api.add_resource(AdminDriveResource, '/admin/drive/<int:drive_id>')
 
 
 # --- Static File Serving ---
@@ -154,6 +168,4 @@ def uploaded_file(filename):
 
 # --- Main Execution ---
 if __name__ == '__main__':
-    if not os.path.exists(app.config['UPLOAD_FOLDER']):
-        os.makedirs(app.config['UPLOAD_FOLDER'])
     app.run(debug=True, port=5000)

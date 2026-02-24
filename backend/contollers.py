@@ -1,6 +1,6 @@
 
 from flask_restful import Resource, reqparse
-from flask import request
+from flask import request, Response
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
 from models import ApplicationStatus, Base, Users, UserRole, CompanyApprovalStatus, DriveStatus, CompanyProfile, StudentProfile, PlacementDrive, Application, PlacementStat
 from sqlalchemy import create_engine, or_
@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 import json
 from celery_app import redis_client
+from tasks import student_csv_export
 
 # Initialize database session (use the same engine/session as models.py)
 from models import engine
@@ -46,7 +47,9 @@ class PublicDriveResource(Resource):
             'description': drive.job_description,
             'deadline': drive.application_deadline.isoformat() if isinstance(drive.application_deadline, datetime) else str(drive.application_deadline),
             'branch': drive.eligibility_branch,
-            'cgpa': drive.eligibility_min_cgpa
+            'cgpa': drive.eligibility_min_cgpa,
+            'salary': drive.salary,
+            'location': drive.location
         }, 200
 
 
@@ -128,6 +131,9 @@ class LoginResource(Resource):
         if not user or user.password != password:
             return {"message": "invalid email or password"}, 401
         
+        if user.is_blacklisted:
+            return {"message": "Your account has been suspended."}, 403
+        
         token = create_access_token(identity=str(user.id))
 
         return {
@@ -144,6 +150,53 @@ class LoginResource(Resource):
 
 
 # admin apis
+class AdminCompanyResource(Resource):
+    @jwt_required()
+    def get(self, company_id):
+        if not is_admin():
+            return {"message": "Admin access required"}, 403
+        
+        company = db.query(CompanyProfile).filter(CompanyProfile.user_id == company_id).first()
+        if not company:
+            return {'message': 'Company profile not found'}, 404
+
+        drives = db.query(PlacementDrive).filter(PlacementDrive.company_id == company.user_id).all()
+        
+        return {
+            'id': company.user_id,
+            'company_name': company.company_name,
+            'email': company.user.email,
+            'hr_contact': company.hr_contact,
+            'approval_status': company.approval_status.value,
+            'description': company.description,
+            'drives': [{
+                'id': d.id,
+                'title': d.job_title,
+                'status': d.status.value,
+                'deadline': d.application_deadline.isoformat() if isinstance(d.application_deadline, datetime) else str(d.application_deadline),
+            } for d in drives]
+        }, 200
+
+class AdminDriveResource(Resource):
+    @jwt_required()
+    def get(self, drive_id):
+        if not is_admin():
+            return {'message': 'admin access required'}, 403
+        drive = db.query(PlacementDrive).get(drive_id)
+        if not drive:
+            return {'message': 'drive not found'}, 404
+        return {
+            'id': drive.id,
+            'title': drive.job_title,
+            'company': drive.company_name,
+            'description': drive.job_description,
+            'deadline': drive.application_deadline.isoformat() if isinstance(drive.application_deadline, datetime) else str(drive.application_deadline),
+            'branch': drive.eligibility_branch,
+            'cgpa': drive.eligibility_min_cgpa,
+            'salary': drive.salary,
+            'location': drive.location
+        }, 200
+
 
 class CompaniesList(Resource):
     @jwt_required()
@@ -185,9 +238,9 @@ class DrivesListResource(Resource):
             'drives': [{
                 'id': d.id,
                 'title': d.job_title,
-                'company': d.company.company_name if d.company else None,
+                'company': d.company_name,
                 'deadline': d.application_deadline.isoformat() if isinstance(d.application_deadline, datetime) else str(d.application_deadline),
-                'status': d.status.value # Add status to the response
+                'status': d.status.value
             } for d in drives]
         }, 200
     
@@ -339,6 +392,8 @@ class CompanyDrivesResource(Resource):
         parser.add_argument('eligibility_min_cgpa', type=float, required=True)
         parser.add_argument('eligibility_year', type=int, required=True)
         parser.add_argument('application_deadline', required=True)
+        parser.add_argument('salary', required=True)
+        parser.add_argument('location', required=True)
         args = parser.parse_args()
 
         drive = PlacementDrive(
@@ -351,7 +406,9 @@ class CompanyDrivesResource(Resource):
             eligibility_year=args['eligibility_year'],
             application_deadline=datetime.fromisoformat(args['application_deadline']),
             status=DriveStatus.PENDING,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            salary=args['salary'],
+            location=args['location']
         )
         db.add(drive)
         db.commit()
@@ -384,6 +441,7 @@ class CompanyDriveApplicationsResource(Resource):
         return {
             'applications': [{
                 'id': a.id,
+                'student_id': a.student_id,
                 'student_name': a.student_name,
                 'application_date': a.application_date.isoformat() if isinstance(a.application_date, datetime) else str(a.application_date),
                 'status': a.status.value
@@ -398,13 +456,72 @@ class CompanyApplicationStatusResource(Resource):
         app = db.query(Application).join(PlacementDrive).filter(Application.id == application_id, PlacementDrive.company_id == user_id).first()
         if not app:
             return {'message': 'application not found'}, 404
+        
         status = request.json.get('status')
-        if status not in [e.value for e in ApplicationStatus]:
-            return {'message': 'invalid status'}, 400
-        app.status = ApplicationStatus[status]
-        db.commit()
-        return {'message': f'application status updated to {status}'}, 200
+        if not status or status not in [e.value for e in ApplicationStatus]:
+            return {'message': 'Invalid status provided'}, 400
+
+        new_status = ApplicationStatus[status]
+
+        if new_status == ApplicationStatus.HIRED:
+            student_id = app.student_id
+            
+            # Check if student is already placed
+            already_placed = db.query(PlacementStat).filter_by(student_id=student_id).first()
+            if already_placed:
+                return {'message': 'This student has already been recorded as placed.'}, 400
+
+            app.status = ApplicationStatus.HIRED
+            drive = db.query(PlacementDrive).get(app.drive_id)
+
+            new_placement = PlacementStat(
+                student_id=student_id,
+                drive_id=app.drive_id,
+                company_name=drive.company_name,
+                salary=drive.salary,
+                placement_date=datetime.utcnow()
+            )
+            db.add(new_placement)
+
+            db.query(Application).filter(
+                Application.student_id == student_id,
+                Application.id != application_id,
+                or_(
+                    Application.status == ApplicationStatus.APPLIED,
+                    Application.status == ApplicationStatus.SHORTLISTED
+                )
+            ).update({'status': ApplicationStatus.REJECTED})
+
+            db.commit()
+            return {'message': 'Student hired successfully. A placement record has been created and other applications have been rejected.'}, 200
+        else:
+            app.status = new_status
+            db.commit()
+            return {'message': f'Application status updated to {status}'}, 200
     
+class StudentProfileViewResource(Resource):
+    @jwt_required()
+    def get(self, student_id):
+        user_id = int(get_jwt_identity())
+        user = db.query(Users).filter(Users.id == user_id).first()
+
+        if not user or (user.role not in [UserRole.Admin, UserRole.COMPANY]):
+            return {'message': 'Unauthorized'}, 403
+
+        student = db.query(StudentProfile).filter(StudentProfile.user_id == student_id).first()
+        if not student:
+            return {'message': 'student profile not found'}, 404
+        return {
+            'id': student.user_id,
+            'name': student.user.name,
+            'email': student.user.email,
+            'branch': student.branch,
+            'cgpa': student.cgpa,
+            'graduation_year': student.graduation_year,
+            'skills': student.skills,
+            'bio': getattr(student, 'bio', ''),
+            'avatar_url': getattr(student, 'avatar_url', None)
+        }, 200
 
 class StudentProfileResource(Resource):
     @jwt_required()
@@ -420,7 +537,9 @@ class StudentProfileResource(Resource):
             'branch': student.branch,
             'cgpa': student.cgpa,
             'graduation_year': student.graduation_year,
-            'skills': student.skills
+            'skills': student.skills,
+            'bio': getattr(student, 'bio', ''),
+            'avatar_url': getattr(student, 'avatar_url', None)
         }, 200
     
     @jwt_required()
@@ -431,6 +550,7 @@ class StudentProfileResource(Resource):
         parser.add_argument('cgpa', type=float)
         parser.add_argument('graduation_year', type=int)
         parser.add_argument('skills', type=str)
+        parser.add_argument('bio', type=str)
         args = parser.parse_args()
 
         student = db.query(StudentProfile).filter(StudentProfile.user_id == user_id).first()
@@ -441,33 +561,28 @@ class StudentProfileResource(Resource):
             db.commit()
             return {'message': 'profile updated'}, 200
         else: 
-            new_student = StudentProfile(user_id=user_id, **{k: v for k, v in args.items() if v is not None})
-            db.add(new_student)
-            db.commit()
-            return {'message': 'profile created'}, 201
+            return {'message': 'Student profile not found'}, 404
     
 
 class StudentDrivesResource(Resource):
     @jwt_required()
     def get(self):
         user_id = int(get_jwt_identity())
-
-        cache_key = f"drives:{user_id}"
-        cached_drives = redis_client.get(cache_key)
-
-        if cached_drives:
-            return json.loads(cached_drives), 200
-
         student = db.query(StudentProfile).filter(StudentProfile.user_id == user_id).first()
         if not student:
-            return {'message': 'student profile not found'}, 404
-        
-        drives = db.query(PlacementDrive).filter(
-            PlacementDrive.eligibility_branch.ilike(f'%{student.branch}%'),
-            PlacementDrive.eligibility_min_cgpa <= student.cgpa,
-            PlacementDrive.eligibility_year <= student.graduation_year,
-            PlacementDrive.status == DriveStatus.APPROVED
-        ).all()
+            return {'message': 'Student profile not found'}, 404
+
+        # Dynamically build the query
+        query = db.query(PlacementDrive).filter(PlacementDrive.status == DriveStatus.APPROVED)
+
+        if student.branch:
+            query = query.filter(PlacementDrive.eligibility_branch.ilike(f'%{student.branch}%'))
+        if student.cgpa is not None:
+            query = query.filter(PlacementDrive.eligibility_min_cgpa <= student.cgpa)
+        if student.graduation_year:
+            query = query.filter(PlacementDrive.eligibility_year <= student.graduation_year)
+
+        drives = query.all()
 
         result = {
             'drives': [{
@@ -475,12 +590,12 @@ class StudentDrivesResource(Resource):
                 'title': d.job_title,
                 'company': d.company_name,
                 'deadline': d.application_deadline.isoformat() if isinstance(d.application_deadline, datetime) else str(d.application_deadline),
-                'status': d.status.value
+                'status': d.status.value,
+                'salary': d.salary,
+                'location': d.location
             } for d in drives]
         }
         
-        redis_client.setex(cache_key, 300, json.dumps(result))
-
         return result, 200
     
 
@@ -488,21 +603,31 @@ class StudentApplyResource(Resource):
     @jwt_required()
     def post(self, drive_id):
         user_id = int(get_jwt_identity())
+        user = db.query(Users).get(user_id)
         student = db.query(StudentProfile).filter(StudentProfile.user_id == user_id).first()
-        if not student:
-            return {'message': 'student profile not found'}, 404
+
+        if not student or not user:
+            return {'message': 'Student profile not found'}, 404
         
         drive = db.query(PlacementDrive).filter(PlacementDrive.id == drive_id, PlacementDrive.status == DriveStatus.APPROVED).first()
         if not drive:
             return {'message': 'drive not found or not active'}, 404
-        
+
+        # Security: Re-validate eligibility before allowing to apply
+        if not (
+            student.branch and drive.eligibility_branch and student.branch.lower() in drive.eligibility_branch.lower() and
+            student.cgpa and drive.eligibility_min_cgpa and student.cgpa >= drive.eligibility_min_cgpa and
+            student.graduation_year and drive.eligibility_year and student.graduation_year == drive.eligibility_year
+        ):
+            return {'message': 'You do not meet the eligibility criteria for this drive.'}, 403
+
         existing_app = db.query(Application).filter(Application.student_id == user_id, Application.drive_id == drive_id).first()
         if existing_app:
             return {'message': 'already applied to this drive'}, 400
         
         app = Application(
             student_id=user_id,
-            student_name=student.user.name,
+            student_name=user.name,
             drive_id=drive.id,
             drive_title=drive.job_title,
             company_name=drive.company_name,
@@ -528,3 +653,27 @@ class StudentApplicationsResource(Resource):
                 'status': a.status.value
             } for a in apps]
         }, 200
+
+
+class StudentExportResource(Resource):
+    @jwt_required()
+    def post(self):
+        """Initiates the CSV export task for the logged-in student."""
+        user_id = int(get_jwt_identity())
+        task = student_csv_export.delay(user_id)
+        return {'task_id': task.id}, 202
+
+    @jwt_required()
+    def get(self):
+        """Downloads the exported CSV for the logged-in student."""
+        user_id = int(get_jwt_identity())
+        csv_data = redis_client.get(f'csv:{user_id}')
+        if csv_data:
+            return Response(
+                csv_data,
+                mimetype="text/csv",
+                headers={"Content-disposition":
+                         "attachment; filename=application_history.csv"}
+            )
+        else:
+            return {'message': 'Export not found or not ready. Please initiate the export first.'}, 404

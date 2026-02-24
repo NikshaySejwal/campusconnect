@@ -3,6 +3,8 @@ import Landing from '../views/Landing.vue';
 import Login from '../views/Login.vue';
 import Register from '../views/Register.vue';
 import AdminDashboard from '../views/AdminDashboard.vue';
+import AdminCompanyDetails from '../views/AdminCompanyDetails.vue';
+import AdminDriveDetails from '../views/AdminDriveDetails.vue';
 import CompanyDashboard from '../views/CompanyDashboard.vue';
 import CreateDrive from '../views/CreateDrive.vue';
 import ApplicationHistory from '../views/ApplicationHistory.vue';
@@ -21,6 +23,18 @@ const routes = [
     component: AdminDashboard, 
     meta: { requiresAuth: true, role: 'ADMIN' } 
   },
+  {
+    path: '/admin/company/:id',
+    name: 'AdminCompanyDetails',
+    component: AdminCompanyDetails,
+    meta: { requiresAuth: true, role: 'ADMIN' }
+  },
+  {
+    path: '/admin/drive/:id',
+    name: 'AdminDriveDetails',
+    component: AdminDriveDetails,
+    meta: { requiresAuth: true, role: 'ADMIN' }
+  },
   { 
     path: '/company/dashboard', 
     name: 'CompanyDashboard', 
@@ -33,11 +47,17 @@ const routes = [
     component: CreateDrive, 
     meta: { requiresAuth: true, role: 'COMPANY' } 
   },
-  { 
-    path: '/company/drive/:id/applicants', 
-    name: 'DriveApplicants', 
-    component: DriveApplicants, 
-    meta: { requiresAuth: true, role: 'COMPANY' } 
+  {
+    path: '/student/:id/profile',
+    name: 'StudentProfileView',
+    component: StudentProfile,
+    meta: { requiresAuth: true, role: ['COMPANY', 'ADMIN'] }
+  },
+  {
+    path: '/company/drive/:id/applicants',
+    name: 'DriveApplicants',
+    component: DriveApplicants,
+    meta: { requiresAuth: true, role: 'COMPANY' }
   },
   { 
     path: '/student/dashboard', 
@@ -62,7 +82,7 @@ const routes = [
     name: 'DriveDetails',
     component: DriveDetails,
     meta: { requiresAuth: true }
-  }
+  },
 ];
 
 const router = createRouter({
@@ -74,7 +94,6 @@ router.beforeEach((to, from, next) => {
   const loggedIn = !!localStorage.getItem('access_token');
   const user = JSON.parse(localStorage.getItem('user'));
 
-  // If the user is logged in, redirect them away from public pages to their dashboard
   if (loggedIn && ['Landing', 'Login', 'Register'].includes(to.name)) {
     if (user && user.role) {
       switch (user.role) {
@@ -85,36 +104,33 @@ router.beforeEach((to, from, next) => {
         case 'STUDENT':
           return next({ name: 'StudentDashboard' });
         default:
-          // Fallback in case of an unknown role
           return next({ name: 'Landing' });
       }
     }
   }
 
-  // If the route requires authentication
   if (to.meta.requiresAuth) {
-    // If the user is not logged in, redirect to the login page
     if (!loggedIn) {
       return next({ name: 'Login' });
     }
 
-    // If the route requires a specific role and the user's role doesn't match,
-    // redirect them to their respective dashboard.
-    if (to.meta.role && user && to.meta.role !== user.role) {
-      switch (user.role) {
-        case 'ADMIN':
-          return next({ name: 'AdminDashboard' });
-        case 'COMPANY':
-          return next({ name: 'CompanyDashboard' });
-        case 'STUDENT':
-          return next({ name: 'StudentDashboard' });
-        default:
-          return next({ name: 'Landing' });
+    if (to.meta.role) {
+      const requiredRoles = Array.isArray(to.meta.role) ? to.meta.role : [to.meta.role];
+      if (!requiredRoles.includes(user.role)) {
+        switch (user.role) {
+          case 'ADMIN':
+            return next({ name: 'AdminDashboard' });
+          case 'COMPANY':
+            return next({ name: 'CompanyDashboard' });
+          case 'STUDENT':
+            return next({ name: 'StudentDashboard' });
+          default:
+            return next({ name: 'Landing' });
+        }
       }
     }
   }
 
-  // Otherwise, allow the navigation to proceed
   next();
 });
 

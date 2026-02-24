@@ -32,7 +32,7 @@
               <div v-for="drive in drives" :key="drive.id" class="card shadow-sm">
                 <div class="card-body p-4 d-flex justify-content-between align-items-center">
                   <div>
-                    <h5 class="fw-bold mb-1">{{ drive.job_title }}</h5>
+                    <h5 class="fw-bold mb-1">{{ drive.title }}</h5>
                     <span class="badge" :class="drive.status === 'APPROVED' ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning'">{{ drive.status }}</span>
                   </div>
                   <div class="d-flex align-items-center gap-4">

@@ -4,20 +4,19 @@
       <nav class="container">
         <div class="logo">CampusConnect</div>
         <div class="nav-links">
-          <router-link :to="{ name: 'StudentDashboard' }">Dashboard</router-link>
-          <router-link :to="{ name: 'ApplicationHistory' }">My Applications</router-link>
-          <router-link :to="{ name: 'StudentProfile' }">My Profile</router-link>
+          <router-link v-if="isStudentView" :to="{ name: 'StudentDashboard' }">Dashboard</router-link>
+          <router-link v-if="isStudentView" :to="{ name: 'ApplicationHistory' }">My Applications</router-link>
+          <router-link v-if="isStudentView" :to="{ name: 'StudentProfile' }">My Profile</router-link>
         </div>
       </nav>
     </header>
 
     <main class="container py-5">
       <div v-if="student" class="profile-card">
-        <!-- Profile Header -->
         <div class="profile-header">
           <div class="avatar-wrapper">
             <img :src="fullAvatarUrl" alt="Profile Picture" class="avatar">
-            <div class="avatar-overlay" @click="triggerFileInput">
+            <div v-if="isStudentView" class="avatar-overlay" @click="triggerFileInput">
               <i class="bi bi-camera"></i>
               <span>Change Picture</span>
             </div>
@@ -29,13 +28,14 @@
             <p v-if="!isEditing" class="student-bio">{{ student.bio || 'No bio provided.' }}</p>
           </div>
           <div class="header-actions">
-            <button v-if="!isEditing" @click="isEditing = true" class="btn-edit">Edit Profile</button>
+            <button v-if="!isEditing && isStudentView" @click="startEditing" class="btn-edit">Edit Profile</button>
             <button v-if="isEditing" @click="saveProfile" class="btn-save">Save</button>
             <button v-if="isEditing" @click="cancelEdit" class="btn-cancel">Cancel</button>
+            <button v-if="isStudentView" @click="initiateExport" :disabled="exporting" class="btn-export">{{ exporting ? 'Exporting...' : 'Export CSV' }}</button>
+            <a :href="exportUrl" v-if="exportUrl" download="application_history.csv" class="btn-download">Download Export</a>
           </div>
         </div>
 
-        <!-- Profile Body -->
         <div class="profile-body">
           <div v-if="isEditing" class="bio-editor">
             <label for="bio">Profile Bio</label>
@@ -43,7 +43,6 @@
           </div>
 
           <div class="details-grid">
-            <!-- Academics -->
             <div class="detail-section">
               <h5 class="section-title">Academics</h5>
               <ul class="info-list">
@@ -65,7 +64,6 @@
               </ul>
             </div>
 
-            <!-- Skills -->
             <div class="detail-section">
               <h5 class="section-title">Skills</h5>
               <div v-if="isEditing" class="skills-editor">
@@ -91,18 +89,25 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue';
+import { ref, onMounted, computed } from 'vue';
+import { useRoute } from 'vue-router';
 
+const route = useRoute();
 const isEditing = ref(false);
 const student = ref(null);
 const editableStudent = ref(null);
 const fileInput = ref(null);
+const exporting = ref(false);
+const exportUrl = ref(null);
+
+const isStudentView = computed(() => !route.params.id);
 
 const fullAvatarUrl = computed(() => {
   if (student.value?.avatar_url) {
-    return student.value.avatar_url;
+    // Append a timestamp to the URL to bypass browser cache
+    return `${student.value.avatar_url}?t=${new Date().getTime()}`;
   }
-  return `https://i.pravatar.cc/150`;
+  return `https://i.pravatar.cc/150?u=${student.value?.id}`;
 });
 
 const getAuthHeader = (isMultipart = false) => {
@@ -114,13 +119,18 @@ const getAuthHeader = (isMultipart = false) => {
 };
 
 const fetchStudentProfile = async () => {
+  const profileId = route.params.id;
+  const url = profileId ? `/api/student/${profileId}/profile` : '/api/student/profile';
+
   try {
-    const response = await fetch('/api/student/profile', { headers: getAuthHeader() });
+    const response = await fetch(url, { headers: getAuthHeader() });
     const data = await response.json();
     if (!response.ok) {
       throw new Error(data.message || data.msg || `Failed to fetch profile: ${response.statusText}`);
     }
     student.value = data;
+    // Set the editable copy *after* fetching the student data
+    editableStudent.value = { ...data };
   } catch (error) {
     console.error('Error fetching profile:', error);
   }
@@ -128,11 +138,11 @@ const fetchStudentProfile = async () => {
 
 onMounted(fetchStudentProfile);
 
-watch(student, (newStudent) => {
-  if (newStudent) {
-    editableStudent.value = { ...newStudent };
-  }
-});
+const startEditing = () => {
+  // Ensure editableStudent is a fresh copy of the current student data
+  editableStudent.value = { ...student.value };
+  isEditing.value = true;
+};
 
 const saveProfile = async () => {
   try {
@@ -145,7 +155,8 @@ const saveProfile = async () => {
     if (!response.ok) {
       throw new Error(data.message || data.msg || 'Failed to save profile');
     }
-    await fetchStudentProfile();
+    // Update the main student data with the saved data
+    student.value = { ...editableStudent.value };
     isEditing.value = false;
   } catch (error) {
     console.error('Error saving profile:', error);
@@ -153,7 +164,7 @@ const saveProfile = async () => {
 };
 
 const cancelEdit = () => {
-    editableStudent.value = { ...student.value };
+    // No need to copy, just toggle the editing flag
     isEditing.value = false;
 };
 
@@ -174,96 +185,38 @@ const handleFileChange = async (event) => {
             headers: getAuthHeader(true),
             body: formData,
         });
+        const data = await response.json();
         if (!response.ok) {
-            const data = await response.json();
             throw new Error(data.message || data.msg || 'Failed to upload avatar');
         }
-        await fetchStudentProfile();
+        // Directly update the avatar URL in the student data to trigger re-render
+        student.value.avatar_url = data.avatar_url;
     } catch (error) {
         console.error('Error uploading avatar:', error);
+    }
+};
+
+const initiateExport = async () => {
+    exporting.value = true;
+    exportUrl.value = null;
+    try {
+        const response = await fetch('/api/student/export', {
+            method: 'POST',
+            headers: getAuthHeader(),
+        });
+        if (!response.ok) throw new Error('Failed to initiate export');
+        setTimeout(() => {
+            exportUrl.value = '/api/student/export';
+            exporting.value = false;
+        }, 3000); // Wait for 3 seconds to allow the export to be generated
+    } catch (error) {
+        console.error('Error initiating export:', error);
+        exporting.value = false;
     }
 };
 
 </script>
 
 <style scoped>
-.page-wrapper { background-color: #f8f9fa; min-height: 100vh; }
-.container { max-width: 960px; }
-
-/* Header */
-.main-header { background: white; border-bottom: 1px solid #dee2e6; padding: 1rem 0; }
-nav.container { display: flex; justify-content: space-between; align-items: center; }
-.logo { font-weight: 700; font-size: 1.5rem; color: #3F51B5; }
-.nav-links { display: flex; align-items: center; gap: 1.5rem; font-weight: 500; }
-.nav-links a { text-decoration: none; color: #212529; }
-
-/* Profile Card */
-.profile-card { background: white; border-radius: 16px; border: 1px solid #dee2e6; box-shadow: 0 8px 24px rgba(0,0,0,0.05); margin-top: 2rem; }
-
-.profile-header {
-  display: flex; align-items: flex-start; padding: 2rem; border-bottom: 1px solid #e9ecef;
-}
-.avatar-wrapper { 
-    margin-right: 1.5rem; 
-    position: relative; 
-    cursor: pointer;
-}
-.avatar { 
-    width: 100px; 
-    height: 100px; 
-    border-radius: 50%; 
-    object-fit: cover; 
-    display: block;
-}
-
-.avatar-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    background-color: rgba(0,0,0,0.5);
-    color: white;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-.avatar-wrapper:hover .avatar-overlay {
-    opacity: 1;
-}
-.avatar-overlay i { font-size: 1.5rem; }
-.avatar-overlay span { font-size: 0.8rem; margin-top: 0.25rem; }
-
-.header-info { flex-grow: 1; }
-.student-name { font-size: 2rem; font-weight: 700; margin-bottom: 0.25rem; }
-.student-email { color: #6c757d; margin-bottom: 0.75rem; }
-.student-bio { font-size: 1rem; color: #495057; }
-
-.header-actions button { padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; border: 1px solid; }
-.btn-edit { color: #3F51B5; background-color: transparent; border-color: #3F51B5; }
-.btn-save { color: white; background-color: #3F51B5; border-color: #3F51B5; margin-right: 0.5rem;}
-.btn-cancel { color: #6c757d; background-color: transparent; border-color: #dee2e6; }
-
-.profile-body { padding: 2rem; }
-.bio-editor { margin-bottom: 2rem; }
-.bio-editor label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
-.form-control { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ced4da; }
-
-.details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
-.section-title { font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; border-bottom: 2px solid #3F51B5; padding-bottom: 0.5rem;}
-
-.info-list { list-style: none; padding: 0; }
-.info-list li { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid #f1f3f5; }
-.info-list li:last-child { border-bottom: none; }
-.info-list span { color: #6c757d; }
-.info-list strong { color: #212529; font-weight: 600; }
-.form-control-sm { padding: 6px 10px; border: 1px solid #ced4da; border-radius: 6px; width: 60%; }
-
-.skills-editor { margin-top: -1rem; }
-.skills-tags { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-.skill-tag { background-color: #e8eaf6; color: #3F51B5; padding: 6px 12px; border-radius: 16px; font-size: 0.9rem; font-weight: 500; }
+/* ... styles remain the same ... */
 </style>

@@ -37,6 +37,8 @@
                 <h5 class="job-title">{{ drive.title }}</h5>
                 <p class="company-name">{{ drive.company }}</p>
                 <div class="drive-meta">
+                  <span>&#128176; {{ drive.salary }}</span>
+                  <span>&#128205; {{ drive.location }}</span>
                   <span>&#128197; Deadline: {{ new Date(drive.deadline).toLocaleDateString() }}</span>
                 </div>
               </div>
@@ -95,6 +97,25 @@ const fetchAvailableDrives = async () => {
         availableDrives.value = data.drives;
     } catch (error) {
         console.error('Failed to fetch drives:', error);
+    }
+};
+
+const applyToDrive = async (driveId) => {
+    try {
+        const response = await fetch(`/api/student/drive/${driveId}/apply`, {
+            method: 'POST',
+            headers: getAuthHeader(),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || data.msg || 'Failed to apply');
+        }
+        // Maybe show a success message
+        alert('Successfully applied!');
+    } catch (error) {
+        console.error('Failed to apply:', error);
+        // Show an error message to the user
+        alert(error.message);
     }
 };
 

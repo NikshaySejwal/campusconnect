@@ -11,20 +11,28 @@
             <div class="mb-4">
                 <h5 class="text-primary fw-semibold">{{ drive.company }}</h5>
                 <p class="text-muted">
-                    Software Development Engineer at a leading tech firm.
+                    {{ drive.description.substring(0, 100) }}...
                 </p>
             </div>
 
             <div class="row border-top pt-4 mb-4">
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <p class="text-muted mb-1">Salary</p>
+                    <h6 class="fw-semibold">{{ drive.salary }}</h6>
+                </div>
+                <div class="col-md-3">
+                    <p class="text-muted mb-1">Location</p>
+                    <h6 class="fw-semibold">{{ drive.location }}</h6>
+                </div>
+                <div class="col-md-3">
                     <p class="text-muted mb-1">Eligibility</p>
                     <h6 class="fw-semibold">{{ drive.branch }}</h6>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <p class="text-muted mb-1">Min CGPA</p>
                     <h6 class="fw-semibold">{{ drive.cgpa }}</h6>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3 mt-3">
                     <p class="text-muted mb-1">Deadline</p>
                     <h6 class="fw-semibold">{{ drive.deadline }}</h6>
                 </div>
@@ -34,7 +42,10 @@
             <p class="text-muted">{{ drive.description }}</p>
 
             <div class="mt-5">
-                <button class="btn btn-primary btn-lg">Apply Now</button>
+                <button @click="apply" class="btn btn-primary btn-lg" :disabled="isApplied">
+                  <span v-if="isApplied">Applied</span>
+                  <span v-else>Apply Now</span>
+                </button>
                 <button class="btn btn-outline-secondary btn-lg ms-2">Save for Later</button>
             </div>
         </div>
@@ -52,11 +63,14 @@ import { useRoute } from 'vue-router';
 
 const drive = ref(null);
 const route = useRoute();
+const isApplied = ref(false);
+
+const getAuthHeader = () => ({ 'Authorization': `Bearer ${localStorage.getItem('access_token')}` });
 
 onMounted(async () => {
   const driveId = route.params.id;
   try {
-    const response = await fetch(`http://localhost:5000/drive/${driveId}`);
+    const response = await fetch(`/api/drive/${driveId}`);
     const data = await response.json();
     drive.value = {
         ...data,
@@ -66,6 +80,25 @@ onMounted(async () => {
     console.error('Failed to fetch drive details:', error);
   }
 });
+
+const apply = async () => {
+  const driveId = route.params.id;
+  try {
+    const response = await fetch(`/api/student/drive/${driveId}/apply`, {
+      method: 'POST',
+      headers: getAuthHeader(),
+    });
+    const data = await response.json();
+    if (response.ok) {
+      isApplied.value = true;
+    } else {
+      throw new Error(data.message || 'Failed to apply');
+    }
+  } catch (error) {
+    console.error('Failed to apply:', error);
+    alert(error.message);
+  }
+};
 </script>
 
 <style scoped>

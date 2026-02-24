@@ -66,6 +66,8 @@ class StudentProfile(Base):
     cgpa = Column(Float, nullable=True) # make nullable
     graduation_year = Column(Integer, nullable=True) # make nullable
     skills = Column(Text, nullable=True)  # make nullable
+    avatar_url = Column(String(200), nullable=True)
+    bio = Column(Text, nullable=True)
 
 
 class PlacementDrive(Base):
@@ -75,6 +77,8 @@ class PlacementDrive(Base):
     company_name = Column(String(100), nullable=False)
     job_title = Column(String(100), nullable=False)
     job_description = Column(Text, nullable=False)
+    salary = Column(String(100), nullable=True)
+    location = Column(String(100), nullable=True)
 
     # flattened eligibility
     eligibility_branch = Column(String(200), nullable=False)

@@ -52,10 +52,18 @@
             <!-- Application Details Card -->
             <div class="form-card">
               <div class="card-header">
-                  <h5 class="card-title">Application Details</h5>
+                  <h5 class="card-title">Application & Offer Details</h5>
               </div>
               <div class="card-body">
                 <div class="form-row">
+                  <div class="form-group-col">
+                    <label for="salary">Salary</label>
+                    <input type="text" class="form-control" id="salary" v-model="drive.salary" placeholder="e.g., $100,000" required>
+                  </div>
+                  <div class="form-group-col">
+                    <label for="location">Location</label>
+                    <input type="text" class="form-control" id="location" v-model="drive.location" placeholder="e.g., New York, NY" required>
+                  </div>
                   <div class="form-group-col">
                     <label for="application_deadline">Application Deadline</label>
                     <input type="date" class="form-control" id="application_deadline" v-model="drive.application_deadline" required>
@@ -92,6 +100,8 @@ const drive = ref({
   eligibility_min_cgpa: null,
   eligibility_year: null,
   application_deadline: '',
+  salary: '',
+  location: ''
 });
 
 const isLoading = ref(false);

@@ -46,7 +46,7 @@
       <div class="tabs-container">
         <div class="tabs-row">
           <button 
-            v-for="tab in ['Approvals', 'Moderation']" 
+            v-for="tab in ['Approvals', 'Manage Companies', 'Manage Drives', 'Moderation']" 
             :key="tab"
             @click="activeTab = tab"
             :class="[
@@ -54,7 +54,7 @@
               activeTab === tab ? 'bg-white text-dark shadow-sm' : 'btn-light text-muted'
             ]"
           >
-            {{ tab === 'Approvals' ? 'Pending Approvals' : 'User Moderation' }}
+            {{ tab }}
           </button>
         </div>
 
@@ -73,6 +73,7 @@
                                     <p class="text-xs text-muted mb-0">{{ company.email }}</p>
                                 </div>
                                 <div class="d-flex gap-2">
+                                    <router-link :to="{ name: 'AdminCompanyDetails', params: { id: company.id } }" class="btn btn-sm btn-outline-info">View</router-link>
                                     <button @click="updateCompanyStatus(company.id, 'REJECTED')" class="btn btn-sm btn-outline-danger">Reject</button>
                                     <button @click="updateCompanyStatus(company.id, 'APPROVED')" class="btn btn-sm btn-success">Approve</button>
                                 </div>
@@ -96,6 +97,7 @@
                                     <p class="text-xs text-muted mb-0">{{ drive.company }}</p>
                                 </div>
                                 <div class="d-flex gap-2">
+                                    <router-link :to="{ name: 'AdminDriveDetails', params: { id: drive.id } }" class="btn btn-sm btn-outline-info">View</router-link>
                                     <button @click="updateDriveStatus(drive.id, 'REJECTED')" class="btn btn-sm btn-outline-danger">Reject</button>
                                     <button @click="updateDriveStatus(drive.id, 'APPROVED')" class="btn btn-sm btn-success">Approve</button>
                                 </div>
@@ -107,8 +109,91 @@
             </div>
         </div>
 
+        <!-- Manage Companies Content -->
+        <div v-if="activeTab === 'Manage Companies'" class="card border-light-subtle shadow-sm">
+            <div class="card-header bg-white d-flex flex-row align-items-center justify-content-between p-4">
+                <div>
+                    <h5 class="fw-semibold mb-0">Manage Company Status</h5>
+                    <p class="card-subtitle text-muted mt-1">Approve, reject, or pend company registrations.</p>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="bg-light">
+                        <tr class="border-light-subtle">
+                            <th class="px-4 py-3 text-uppercase text-muted fw-medium">Company</th>
+                            <th class="px-4 py-3 text-uppercase text-muted fw-medium">Status</th>
+                            <th class="px-4 py-3 text-uppercase text-muted fw-medium text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="company in allCompanies" :key="company.id">
+                            <td class="px-4 py-3">
+                                <div class="fw-bold text-dark">{{ company.company_name }}</div>
+                                <div class="text-xs text-muted">{{ company.email }}</div>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span :class="['badge fw-semibold', getStatusClass(company.approval_status)]">{{ company.approval_status }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-end">
+                                <div class="d-flex gap-2 justify-content-end">
+                                    <router-link :to="{ name: 'AdminCompanyDetails', params: { id: company.id } }" class="btn btn-sm btn-outline-info">View</router-link>
+                                    <button @click="updateCompanyStatus(company.id, 'APPROVED')" class="btn btn-sm btn-success">Approve</button>
+                                    <button @click="updateCompanyStatus(company.id, 'REJECTED')" class="btn btn-sm btn-danger">Reject</button>
+                                    <button @click="updateCompanyStatus(company.id, 'PENDING')" class="btn btn-sm btn-warning">Pend</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Manage Drives Content -->
+        <div v-if="activeTab === 'Manage Drives'" class="card border-light-subtle shadow-sm">
+            <div class="card-header bg-white d-flex flex-row align-items-center justify-content-between p-4">
+                <div>
+                    <h5 class="fw-semibold mb-0">Manage Drive Status</h5>
+                    <p class="card-subtitle text-muted mt-1">Approve, reject, or pend placement drives.</p>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="bg-light">
+                        <tr class="border-light-subtle">
+                            <th class="px-4 py-3 text-uppercase text-muted fw-medium">Drive</th>
+                            <th class="px-4 py-3 text-uppercase text-muted fw-medium">Company</th>
+                            <th class="px-4 py-3 text-uppercase text-muted fw-medium">Status</th>
+                            <th class="px-4 py-3 text-uppercase text-muted fw-medium text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="drive in allDrives" :key="drive.id">
+                            <td class="px-4 py-3">
+                                <div class="fw-bold text-dark">{{ drive.title }}</div>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="text-xs text-muted">{{ drive.company }}</div>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span :class="['badge fw-semibold', getStatusClass(drive.status)]">{{ drive.status }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-end">
+                                <div class="d-flex gap-2 justify-content-end">
+                                    <router-link :to="{ name: 'AdminDriveDetails', params: { id: drive.id } }" class="btn btn-sm btn-outline-info">View</router-link>
+                                    <button @click="updateDriveStatus(drive.id, 'APPROVED')" class="btn btn-sm btn-success">Approve</button>
+                                    <button @click="updateDriveStatus(drive.id, 'REJECTED')" class="btn btn-sm btn-danger">Reject</button>
+                                    <button @click="updateDriveStatus(drive.id, 'PENDING')" class="btn btn-sm btn-warning">Pend</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- Moderation Content -->
-        <div v-else class="card border-light-subtle shadow-sm">
+        <div v-if="activeTab === 'Moderation'" class="card border-light-subtle shadow-sm">
           <div class="card-header bg-white d-flex flex-row align-items-center justify-content-between p-4">
             <div>
               <h5 class="fw-semibold mb-0">User Control Panel</h5>
@@ -238,6 +323,15 @@ const fetchAllData = async () => {
   }
 };
 
+const getStatusClass = (status) => {
+    switch (status) {
+        case 'APPROVED': return 'bg-success-soft text-success';
+        case 'REJECTED': return 'bg-danger-soft text-danger';
+        case 'PENDING': return 'bg-warning-soft text-warning';
+        default: return 'bg-light text-muted';
+    }
+};
+
 const updateCompanyStatus = async (id, status) => {
   try {
     await postData(`/api/admin/company/${id}/status`, { status });
@@ -364,6 +458,12 @@ onMounted(fetchAllData);
     background-color: #fef2f2;
     border: 1px solid #fecaca;
     color: #991b1b;
+}
+
+.badge.bg-warning-soft {
+    background-color: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
 }
 
 .border-light-subtle { border-color: #e2e8f0 !important; }
