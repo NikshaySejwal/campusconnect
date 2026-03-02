@@ -1,58 +1,45 @@
 <template>
-  <div class="page-wrapper">
-    <header class="main-header">
-      <nav class="container">
-        <div class="logo">CampusConnect</div>
-        <div class="nav-links">
-          <router-link :to="{ name: 'StudentDashboard' }">Dashboard</router-link>
-          <router-link :to="{ name: 'ApplicationHistory' }">My Applications</router-link>
-          <router-link :to="{ name: 'StudentProfile' }">My Profile</router-link>
-        </div>
-      </nav>
-    </header>
-
-    <main class="container py-5">
-      <!-- Header -->
-      <div class="page-header-container">
-        <div>
-          <h1 class="welcome-title">Welcome, {{ studentName || 'Student' }}!</h1>
-          <p class="welcome-subtitle">Explore and apply to the latest placement drives from top companies.</p>
-        </div>
-        <div class="header-buttons">
-          <router-link :to="{ name: 'StudentProfile' }" class="header-btn">My Profile</router-link>
-          <router-link :to="{ name: 'ApplicationHistory' }" class="header-btn">My Applications</router-link>
-        </div>
+  <main class="container py-4">
+    <!-- Page Header -->
+    <div class="page-header mb-4">
+      <div>
+        <h1 class="fw-bold">Welcome, {{ studentName || 'Student' }}!</h1>
+        <p class="text-muted">Explore and apply to the latest placement drives from top companies.</p>
       </div>
+    </div>
 
-      <!-- Available Drives -->
-      <div class="drives-section">
-        <h4 class="section-title">Available Drives</h4>
-        <div v-if="availableDrives.length" class="drives-grid">
-          <div v-for="drive in availableDrives" :key="drive.id" class="drive-card">
-            <div class="card-content">
-              <div class="company-logo-wrapper">
-                <img :src="`https://logo.clearbit.com/${drive.company.toLowerCase().replace(/ /g, '')}.com`" :alt="drive.company" class="company-logo">
+    <!-- Available Drives -->
+    <h4 class="fw-semibold mb-3">Available Drives</h4>
+    <div v-if="availableDrives.length" class="vstack gap-3">
+      <div v-for="drive in availableDrives" :key="drive.id" class="card list-item-card">
+        <div class="card-body p-4 d-flex flex-column flex-md-row align-items-start align-items-md-center">
+          
+          <div class="d-flex align-items-center flex-grow-1 mb-3 mb-md-0">
+            <div class="company-logo-wrapper me-3">
+              <img :src="`https://logo.clearbit.com/${drive.company.toLowerCase().replace(/ /g, '')}.com`" :alt="drive.company" class="company-logo">
+            </div>
+            <div>
+              <h5 class="card-title fw-bold mb-1">{{ drive.title }}</h5>
+              <p class="card-subtitle text-muted fw-semibold mb-2">{{ drive.company }}</p>
+              <div class="d-flex flex-wrap gap-3 text-muted text-xs">
+                <span><i class="bi bi-cash-stack me-1"></i>{{ drive.salary }}</span>
+                <span><i class="bi bi-geo-alt-fill me-1"></i>{{ drive.location }}</span>
+                <span><i class="bi bi-calendar-event-fill me-1"></i>Deadline: {{ new Date(drive.deadline).toLocaleDateString() }}</span>
               </div>
-              <div class="drive-details">
-                <h5 class="job-title">{{ drive.title }}</h5>
-                <p class="company-name">{{ drive.company }}</p>
-                <div class="drive-meta">
-                  <span>&#128176; {{ drive.salary }}</span>
-                  <span>&#128205; {{ drive.location }}</span>
-                  <span>&#128197; Deadline: {{ new Date(drive.deadline).toLocaleDateString() }}</span>
-                </div>
-              </div>
-              <router-link :to="{ name: 'DriveDetails', params: { id: drive.id } }" class="apply-btn">View Details</router-link>
             </div>
           </div>
-        </div>
-        <div v-else class="text-center py-5 text-muted fst-italic">
-          <p>No placement drives are currently available for you.</p>
-          <p>This may be because no drives match your profile, or no drives have been approved yet.</p>
+
+          <div class="ms-md-4">
+            <router-link :to="{ name: 'DriveDetails', params: { id: drive.id } }" class="btn btn-primary">View Details</router-link>
+          </div>
         </div>
       </div>
-    </main>
-  </div>
+    </div>
+    <div v-else class="text-center py-5 text-muted fst-italic border rounded-3">
+      <p>No placement drives are currently available for you.</p>
+      <p class="mb-0">This may be because no drives match your profile or no drives have been approved yet.</p>
+    </div>
+  </main>
 </template>
 
 <script setup>
@@ -100,25 +87,6 @@ const fetchAvailableDrives = async () => {
     }
 };
 
-const applyToDrive = async (driveId) => {
-    try {
-        const response = await fetch(`/api/student/drive/${driveId}/apply`, {
-            method: 'POST',
-            headers: getAuthHeader(),
-        });
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.message || data.msg || 'Failed to apply');
-        }
-        // Maybe show a success message
-        alert('Successfully applied!');
-    } catch (error) {
-        console.error('Failed to apply:', error);
-        // Show an error message to the user
-        alert(error.message);
-    }
-};
-
 onMounted(async () => {
   await fetchStudentProfile();
   await fetchAvailableDrives();
@@ -126,67 +94,35 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.page-wrapper { background-color: #f8f9fa; min-height: 100vh; }
-.container { max-width: 1200px; }
-
-/* Header */
-.main-header { background: white; border-bottom: 1px solid #dee2e6; padding: 1rem 0; }
-nav.container { display: flex; justify-content: space-between; align-items: center; }
-.logo { font-weight: 700; font-size: 1.5rem; color: #3F51B5; }
-.nav-links { display: flex; align-items: center; gap: 1.5rem; font-weight: 500; }
-.nav-links a { text-decoration: none; color: #212529; }
-
-/* Page Header */
-.page-header-container {
-  display: flex; justify-content: space-between; align-items: center; 
-  margin-bottom: 3rem;
+.page-header {
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 1rem;
 }
-.welcome-title { font-size: 2.25rem; font-weight: 700; color: #2c3e50; }
-.welcome-subtitle { font-size: 1.1rem; color: #6c757d; }
-.header-buttons { display: flex; gap: 1rem; }
-.header-btn {
+
+.list-item-card {
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
+}
+
+.company-logo-wrapper {
+  width: 50px;
+  height: 50px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: .375rem;
+  border: 1px solid #e2e8f0;
   background-color: white;
-  border: 1px solid #dee2e6;
-  padding: 10px 20px;
-  border-radius: 8px;
-  text-decoration: none;
-  color: #343a40;
-  font-weight: 600;
 }
 
-/* Drives Section */
-.drives-section { margin-top: 2rem; }
-.section-title { font-size: 1.75rem; font-weight: 600; margin-bottom: 1.5rem; }
-.drives-grid { display: flex; flex-direction: column; gap: 1rem; }
-
-.drive-card {
-  background-color: white;
-  border: 1px solid #dee2e6;
-  border-radius: 12px;
-  transition: all 0.2s ease;
+.company-logo {
+  max-width: 80%;
+  max-height: 80%;
+  object-fit: contain;
 }
-.drive-card:hover { transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0,0,0,0.08); }
 
-.card-content { display: flex; align-items: center; padding: 1.5rem; }
-.company-logo-wrapper { flex-shrink: 0; width: 60px; height: 60px; display: grid; place-items: center; margin-right: 1.5rem; }
-.company-logo { max-width: 100%; max-height: 100%; object-fit: contain; }
-
-.drive-details { flex-grow: 1; }
-.job-title { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.25rem; }
-.company-name { color: #6c757d; font-weight: 500; margin-bottom: 0.75rem; }
-.drive-meta { display: flex; gap: 1.5rem; font-size: 0.9rem; color: #495057; }
-
-.apply-btn {
-  background-color: #3F51B5;
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  border-radius: 8px;
-  cursor: pointer;
-  margin-left: 1.5rem;
-  text-decoration: none;
-  text-align: center;
-}
+.fw-bold { font-weight: 700 !important; }
+.fw-semibold { font-weight: 600; }
+.text-muted { color: #64748b !important; }
+.text-xs { font-size: 0.8rem; }
 </style>

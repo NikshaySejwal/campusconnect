@@ -463,7 +463,7 @@ class CompanyApplicationStatusResource(Resource):
 
         new_status = ApplicationStatus[status]
 
-        if new_status == ApplicationStatus.HIRED:
+        if new_status == ApplicationStatus.SELECTED:
             student_id = app.student_id
             
             # Check if student is already placed
@@ -471,7 +471,7 @@ class CompanyApplicationStatusResource(Resource):
             if already_placed:
                 return {'message': 'This student has already been recorded as placed.'}, 400
 
-            app.status = ApplicationStatus.HIRED
+            app.status = ApplicationStatus.SELECTED
             drive = db.query(PlacementDrive).get(app.drive_id)
 
             new_placement = PlacementStat(
@@ -487,10 +487,10 @@ class CompanyApplicationStatusResource(Resource):
                 Application.student_id == student_id,
                 Application.id != application_id,
                 or_(
-                    Application.status == ApplicationStatus.APPLIED,
-                    Application.status == ApplicationStatus.SHORTLISTED
+                    Application.status == ApplicationStatus.APPLIED.value,
+                    Application.status == ApplicationStatus.SHORTLISTED.value
                 )
-            ).update({'status': ApplicationStatus.REJECTED})
+            ).update({'status': ApplicationStatus.REJECTED.value})
 
             db.commit()
             return {'message': 'Student hired successfully. A placement record has been created and other applications have been rejected.'}, 200

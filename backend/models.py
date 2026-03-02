@@ -29,7 +29,7 @@ class DriveStatus(pyEnum):
 class ApplicationStatus(pyEnum):
     APPLIED = 'APPLIED'
     SHORTLISTED = 'SHORTLISTED'
-    SELECTED = 'SELECTED'
+    HIRED = 'HIRED'
     REJECTED = 'REJECTED'
 
 

@@ -1,12 +1,5 @@
 <template>
   <div class="admin-dashboard">
-    <!-- Navbar placeholder -->
-    <header class="bg-white">
-      <div class="container py-3 px-4">
-        <span class="fw-bold fs-5 text-dark">CampusConnect</span>
-      </div>
-    </header>
-
     <main class="dashboard">
       <!-- Header Section -->
       <div class="header-content">
@@ -15,18 +8,7 @@
       </div>
 
       <!-- Actions -->
-      <div class="actions-toolbar">
-          <button class="btn btn-link p-0 text-dark fw-medium mb-3">Activity Report</button>
-          <div class="position-relative">
-             <i class="bi bi-search position-absolute text-muted search-icon"></i>
-            <input 
-              v-model="search" 
-              type="text" 
-              placeholder="Search portal..." 
-              class="form-control ps-5 py-2 shadow-sm"
-            />
-          </div>
-      </div>
+      
 
       <!-- Stats -->
       <div class="metrics-row">
@@ -57,6 +39,18 @@
             {{ tab }}
           </button>
         </div>
+        <div class="actions-toolbar">
+          <button class="btn btn-link p-0 text-dark fw-medium mb-3">Activity Report</button>
+          <div class="position-relative">
+             <i class="bi bi-search position-absolute text-muted search-icon"></i>
+            <input 
+              v-model="search" 
+              type="text" 
+              placeholder="Search portal..." 
+              class="form-control ps-5 py-2 shadow-sm"
+            />
+          </div>
+      </div>
 
         <!-- Approvals Content -->
         <div v-if="activeTab === 'Approvals'" class="approvals-row">
@@ -359,6 +353,7 @@ const toggleBlacklist = async (user) => {
   }
 };
 
+
 onMounted(fetchAllData);
 
 </script>
@@ -446,24 +441,6 @@ onMounted(fetchAllData);
 
 .table-hover tbody tr:hover {
     background-color: #f8fafc;
-}
-
-.badge.bg-success-soft {
-    background-color: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    color: #166534;
-}
-
-.badge.bg-danger-soft {
-    background-color: #fef2f2;
-    border: 1px solid #fecaca;
-    color: #991b1b;
-}
-
-.badge.bg-warning-soft {
-    background-color: #fffbeb;
-    border: 1px solid #fde68a;
-    color: #92400e;
 }
 
 .border-light-subtle { border-color: #e2e8f0 !important; }

@@ -2,56 +2,65 @@
   <div class="drive-details-page">
     <div class="container my-5">
       <div v-if="drive" class="drive-content">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="card-title fw-bold">{{ drive.title }}</h1>
-                <span class="badge bg-success-soft">Active</span>
-            </div>
-
-            <div class="mb-4">
-                <h5 class="text-primary fw-semibold">{{ drive.company }}</h5>
-                <p class="text-muted">
-                    {{ drive.description.substring(0, 100) }}...
-                </p>
-            </div>
-
-            <div class="row border-top pt-4 mb-4">
-                <div class="col-md-3">
-                    <p class="text-muted mb-1">Salary</p>
-                    <h6 class="fw-semibold">{{ drive.salary }}</h6>
-                </div>
-                <div class="col-md-3">
-                    <p class="text-muted mb-1">Location</p>
-                    <h6 class="fw-semibold">{{ drive.location }}</h6>
-                </div>
-                <div class="col-md-3">
-                    <p class="text-muted mb-1">Eligibility</p>
-                    <h6 class="fw-semibold">{{ drive.branch }}</h6>
-                </div>
-                <div class="col-md-3">
-                    <p class="text-muted mb-1">Min CGPA</p>
-                    <h6 class="fw-semibold">{{ drive.cgpa }}</h6>
-                </div>
-                <div class="col-md-3 mt-3">
-                    <p class="text-muted mb-1">Deadline</p>
-                    <h6 class="fw-semibold">{{ drive.deadline }}</h6>
-                </div>
-            </div>
-
-            <h5 class="fw-bold mb-3">Job Description</h5>
-            <p class="text-muted">{{ drive.description }}</p>
-
-            <div class="mt-5">
-                <button @click="apply" class="btn btn-primary btn-lg" :disabled="isApplied">
-                  <span v-if="isApplied">Applied</span>
-                  <span v-else>Apply Now</span>
-                </button>
-                <button class="btn btn-outline-secondary btn-lg ms-2">Save for Later</button>
-            </div>
+        
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-start mb-4">
+          <div>
+            <h1 class="fw-bold text-dark">{{ drive.title }}</h1>
+            <p class="text-muted fw-medium">Posted by {{ drive.company }}</p>
+          </div>
+          <span class="badge bg-success-soft">Active</span>
         </div>
+
+        <!-- Drive Info Card -->
+        <div class="card info-card">
+          <div class="card-body">
+            <div class="row g-4">
+              <div class="col-md-4 info-item">
+                <h6 class="text-muted">Salary</h6>
+                <p class="fw-semibold text-dark fs-5">{{ drive.salary }}</p>
+              </div>
+              <div class="col-md-4 info-item">
+                <h6 class="text-muted">Location</h6>
+                <p class="fw-semibold text-dark fs-5">{{ drive.location }}</p>
+              </div>
+              <div class="col-md-4 info-item">
+                <h6 class="text-muted">Eligibility</h6>
+                <p class="fw-semibold text-dark fs-5">{{ drive.branch }}</p>
+              </div>
+              <div class="col-md-4 info-item">
+                <h6 class="text-muted">Minimum CGPA</h6>
+                <p class="fw-semibold text-dark fs-5">{{ drive.cgpa }}</p>
+              </div>
+              <div class="col-md-4 info-item">
+                <h6 class="text-muted">Application Deadline</h6>
+                <p class="fw-semibold text-dark fs-5">{{ drive.deadline }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Job Description Card -->
+        <div class="card description-card mt-4">
+          <div class="card-body">
+            <h5 class="fw-bold text-dark mb-3">Job Description</h5>
+            <p class="text-muted">{{ drive.description }}</p>
+          </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="actions-bar mt-4">
+          <button @click="apply" class="btn btn-primary btn-lg" :disabled="isApplied">
+            <span v-if="isApplied">Applied</span>
+            <span v-else>Apply Now</span>
+          </button>
+          <button class="btn btn-outline-secondary btn-lg ms-2">Save for Later</button>
+        </div>
+
       </div>
       <div v-else class="loading-state">
-        <p>Loading...</p>
+        <div class="spinner-border text-primary"></div>
+        <p class="mt-2">Loading Drive Details...</p>
       </div>
     </div>
   </div>
@@ -102,29 +111,47 @@ const apply = async () => {
 </script>
 
 <style scoped>
-
 .drive-details-page {
     background-color: #f8fafc;
+    min-height: 100vh;
 }
+
 .drive-content {
-    max-width: 800px;
+    max-width: 900px;
     margin: auto;
-    background: white;
-    padding: 2.5rem;
-    border-radius: 1rem;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.07);
+}
+
+.info-card, .description-card {
+    border: none;
+    border-radius: .75rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
 }
 
 .fw-bold { font-weight: 700; }
 .fw-semibold { font-weight: 600; }
-.text-primary { color: #4f46e5 !important; }
+.fw-medium { font-weight: 500; }
+
+.text-dark { color: #1a202c !important; }
 .text-muted { color: #64748b !important; }
 
 .badge.bg-success-soft {
-    background-color: #f0fdf4 !important;
-    border: 1px solid #bbf7d0;
-    color: #166534 !important;
     font-size: .8rem;
     padding: .5em .9em;
+}
+
+.info-item h6 {
+    font-size: .85rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+
+.loading-state {
+    text-align: center;
+    padding: 5rem;
+}
+
+.actions-bar {
+    display: flex;
+    justify-content: flex-end;
 }
 </style>

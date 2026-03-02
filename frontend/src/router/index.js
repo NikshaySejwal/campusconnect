@@ -12,76 +12,101 @@ import StudentProfile from '../views/StudentProfile.vue';
 import StudentDashboard from '../views/StudentDashboard.vue';
 import DriveDetails from '../views/DriveDetails.vue';
 import DriveApplicants from '../views/DriveApplicants.vue';
+import CompanyProfile from '../views/CompanyProfile.vue';
 
 const routes = [
   { path: '/', name: 'Landing', component: Landing },
   { path: '/login', name: 'Login', component: Login },
   { path: '/register', name: 'Register', component: Register },
-  { 
-    path: '/admin/dashboard', 
-    name: 'AdminDashboard', 
-    component: AdminDashboard, 
-    meta: { requiresAuth: true, role: 'ADMIN' } 
+  {
+    path: '/admin/dashboard',
+    name: 'AdminDashboard',
+    component: AdminDashboard,
+    meta: { requiresAuth: true, role: 'ADMIN' },
+  },
+  {
+    path: '/admin/drives',
+    name: 'AdminManageDrives',
+    component: AdminDashboard, // Redirect to dashboard
+    meta: { requiresAuth: true, role: 'ADMIN' },
+  },
+  {
+    path: '/admin/students',
+    name: 'AdminManageStudents',
+    component: AdminDashboard, // Redirect to dashboard
+    meta: { requiresAuth: true, role: 'ADMIN' },
   },
   {
     path: '/admin/company/:id',
     name: 'AdminCompanyDetails',
     component: AdminCompanyDetails,
-    meta: { requiresAuth: true, role: 'ADMIN' }
+    meta: { requiresAuth: true, role: 'ADMIN' },
   },
   {
     path: '/admin/drive/:id',
     name: 'AdminDriveDetails',
     component: AdminDriveDetails,
-    meta: { requiresAuth: true, role: 'ADMIN' }
+    meta: { requiresAuth: true, role: 'ADMIN' },
   },
-  { 
-    path: '/company/dashboard', 
-    name: 'CompanyDashboard', 
-    component: CompanyDashboard, 
-    meta: { requiresAuth: true, role: 'COMPANY' } 
+  {
+    path: '/company/dashboard',
+    name: 'CompanyDashboard',
+    component: CompanyDashboard,
+    meta: { requiresAuth: true, role: 'COMPANY' },
   },
-  { 
-    path: '/company/drive/create', 
-    name: 'CreateDrive', 
-    component: CreateDrive, 
-    meta: { requiresAuth: true, role: 'COMPANY' } 
+  {
+    path: '/company/profile',
+    name: 'CompanyProfile',
+    component: CompanyProfile,
+    meta: { requiresAuth: true, role: 'COMPANY' },
+  },
+  {
+    path: '/company/drive/create', // Corrected: removed the 's'
+    name: 'CreateDrive',
+    component: CreateDrive,
+    meta: { requiresAuth: true, role: 'COMPANY' },
+  },
+  {
+    path: '/company/applicants',
+    name: 'CompanyApplicants',
+    component: CompanyDashboard, // Redirect to dashboard
+    meta: { requiresAuth: true, role: 'COMPANY' },
   },
   {
     path: '/student/:id/profile',
     name: 'StudentProfileView',
     component: StudentProfile,
-    meta: { requiresAuth: true, role: ['COMPANY', 'ADMIN'] }
+    meta: { requiresAuth: true, role: ['COMPANY', 'ADMIN'] },
   },
   {
     path: '/company/drive/:id/applicants',
     name: 'DriveApplicants',
     component: DriveApplicants,
-    meta: { requiresAuth: true, role: 'COMPANY' }
+    meta: { requiresAuth: true, role: 'COMPANY' },
   },
-  { 
-    path: '/student/dashboard', 
-    name: 'StudentDashboard', 
-    component: StudentDashboard, 
-    meta: { requiresAuth: true, role: 'STUDENT' } 
+  {
+    path: '/student/dashboard',
+    name: 'StudentDashboard',
+    component: StudentDashboard,
+    meta: { requiresAuth: true, role: 'STUDENT' },
   },
-  { 
-    path: '/student/applications', 
-    name: 'ApplicationHistory', 
-    component: ApplicationHistory, 
-    meta: { requiresAuth: true, role: 'STUDENT' } 
+  {
+    path: '/student/applications',
+    name: 'ApplicationHistory',
+    component: ApplicationHistory,
+    meta: { requiresAuth: true, role: 'STUDENT' },
   },
   {
     path: '/student/profile',
     name: 'StudentProfile',
     component: StudentProfile,
-    meta: { requiresAuth: true, role: 'STUDENT' }
+    meta: { requiresAuth: true, role: 'STUDENT' },
   },
   {
     path: '/drive/:id',
     name: 'DriveDetails',
     component: DriveDetails,
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true },
   },
 ];
 

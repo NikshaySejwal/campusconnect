@@ -1,7 +1,7 @@
 <template>
   <header class="main-header">
     <nav class="container">
-      <router-link to="/" class="logo">Placement Portal</router-link>
+      <router-link to="/" class="logo">CampusConnect</router-link>
       <div class="nav-links">
         <!-- Logged-out users -->
         <template v-if="!isLoggedIn">
@@ -11,10 +11,27 @@
         
         <!-- Logged-in users -->
         <template v-else>
-          <router-link v-if="userRole === 'Admin'" to="/admin/dashboard">Dashboard</router-link>
-          <router-link v-if="userRole === 'Company'" to="/company/dashboard">Dashboard</router-link>
-          <router-link v-if="userRole === 'Student'" to="/student/dashboard">Dashboard</router-link>
-          <router-link v-if="userRole === 'Student'" to="/student/applications">My Applications</router-link>
+          <!-- Admin Links -->
+          <template v-if="userRole === 'Admin'">
+            <router-link to="/admin/dashboard">Dashboard</router-link>
+            
+          </template>
+
+          <!-- Company Links -->
+          <template v-if="userRole === 'Company'">
+            <router-link to="/company/dashboard">Dashboard</router-link>
+            <router-link to="/company/drive/create">Post a Drive</router-link>
+            <router-link to="/company/profile">My Profile</router-link>
+            <router-link to="/company/applicants">View Applicants</router-link>
+          </template>
+          
+          <!-- Student Links -->
+          <template v-if="userRole === 'Student'">
+            <router-link to="/student/dashboard">Dashboard</router-link>
+            <router-link to="/student/applications">My Applications</router-link>
+            <router-link to="/student/profile">My Profile</router-link>
+          </template>
+          
           <a href="#" @click.prevent="logout">Logout</a>
         </template>
       </div>
@@ -23,6 +40,12 @@
 </template>
 
 <script>
+// Helper function to capitalize the first letter of a string
+const capitalize = (s) => {
+  if (typeof s !== 'string') return ''
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+}
+
 export default {
   name: "Navbar",
   data() {
@@ -45,7 +68,8 @@ export default {
       if (token) {
         try {
           const user = JSON.parse(localStorage.getItem("user"));
-          this.userRole = user ? user.role : null;
+          // Capitalize the role to ensure consistent matching (e.g., 'admin' -> 'Admin')
+          this.userRole = user ? capitalize(user.role) : null;
         } catch (e) {
           this.userRole = null;
         }
