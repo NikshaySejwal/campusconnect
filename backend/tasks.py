@@ -33,7 +33,7 @@ def generate_monthly_report():
             'total_drives': session.query(PlacementDrive).count(),
             'total_applications': session.query(Application).count(),
             'placements': session.query(Application).filter(
-                Application.status == ApplicationStatus.SELECTED
+                Application.status == ApplicationStatus.HIRED
             ).count()
         }
         

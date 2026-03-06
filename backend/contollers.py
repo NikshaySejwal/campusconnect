@@ -2,7 +2,7 @@
 from flask_restful import Resource, reqparse
 from flask import request, Response
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
-from models import ApplicationStatus, Base, Users, UserRole, CompanyApprovalStatus, DriveStatus, CompanyProfile, StudentProfile, PlacementDrive, Application, PlacementStat
+from models import ApplicationStatus, Base, Users, UserRole, CompanyApprovalStatus, DriveStatus, CompanyProfile, StudentProfile, PlacementDrive, Application
 from sqlalchemy import create_engine, or_
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
@@ -302,7 +302,7 @@ class AdminStatsResource(Resource):
             'pending_companies': db.query(CompanyProfile).filter_by(approval_status=CompanyApprovalStatus.PENDING).count(),
             'total_drives': db.query(PlacementDrive).count(),
             'active_drives': db.query(PlacementDrive).filter_by(status=DriveStatus.APPROVED).count(),
-            'placements': db.query(PlacementStat).count()
+            'placements': db.query(Application).filter(Application.status == ApplicationStatus.HIRED).count()
         }, 200
     
 
@@ -463,37 +463,30 @@ class CompanyApplicationStatusResource(Resource):
 
         new_status = ApplicationStatus[status]
 
-        if new_status == ApplicationStatus.SELECTED:
+        if new_status == ApplicationStatus.HIRED:
             student_id = app.student_id
-            
-            # Check if student is already placed
-            already_placed = db.query(PlacementStat).filter_by(student_id=student_id).first()
-            if already_placed:
-                return {'message': 'This student has already been recorded as placed.'}, 400
 
-            app.status = ApplicationStatus.SELECTED
-            drive = db.query(PlacementDrive).get(app.drive_id)
+            # Check if student is already hired in another application
+            already_hired = db.query(Application).filter(
+                Application.student_id == student_id,
+                Application.status == ApplicationStatus.HIRED
+            ).first()
+            if already_hired and already_hired.id != application_id:
+                return {'message': 'This student is already hired for another drive.'}, 400
 
-            new_placement = PlacementStat(
-                student_id=student_id,
-                drive_id=app.drive_id,
-                company_name=drive.company_name,
-                salary=drive.salary,
-                placement_date=datetime.utcnow()
-            )
-            db.add(new_placement)
+            app.status = ApplicationStatus.HIRED
 
             db.query(Application).filter(
                 Application.student_id == student_id,
                 Application.id != application_id,
                 or_(
-                    Application.status == ApplicationStatus.APPLIED.value,
-                    Application.status == ApplicationStatus.SHORTLISTED.value
+                    Application.status == ApplicationStatus.APPLIED,
+                    Application.status == ApplicationStatus.SHORTLISTED
                 )
-            ).update({'status': ApplicationStatus.REJECTED.value})
+            ).update({'status': ApplicationStatus.REJECTED})
 
             db.commit()
-            return {'message': 'Student hired successfully. A placement record has been created and other applications have been rejected.'}, 200
+            return {'message': 'Student hired successfully and other applications were rejected.'}, 200
         else:
             app.status = new_status
             db.commit()

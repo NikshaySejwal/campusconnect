@@ -22,7 +22,7 @@
           <div class="col-md-auto text-center text-md-start mb-3 mb-md-0">
             <div class="avatar-wrapper position-relative d-inline-block">
               <img :src="fullAvatarUrl" alt="Profile Picture" class="avatar rounded-circle border p-1">
-              <div v-if="isStudentView && isEditing" class="avatar-overlay position-absolute top-0 start-0 w-100 h-100 rounded-circle d-flex align-items-center justify-content-center" @click="triggerFileInput">
+              <div v-if="isStudentView" class="avatar-overlay position-absolute top-0 start-0 w-100 h-100 rounded-circle d-flex align-items-center justify-content-center" @click="triggerFileInput">
                 <i class="bi bi-camera fs-4"></i>
               </div>
               <input type="file" ref="fileInput" @change="handleFileChange" style="display: none" accept="image/*">
@@ -37,6 +37,7 @@
 
           <div class="col-md-auto d-flex flex-column align-items-stretch gap-2 mt-3 mt-md-0">
             <button v-if="!isEditing && isStudentView" @click="startEditing" class="btn btn-primary">Edit Profile</button>
+            <button v-if="!isEditing && isStudentView" @click="triggerFileInput" class="btn btn-outline-secondary">Change Photo</button>
             <button v-if="isEditing" @click="saveProfile" class="btn btn-success">Save Changes</button>
             <button v-if="isEditing" @click="cancelEdit" class="btn btn-secondary">Cancel</button>
           </div>
